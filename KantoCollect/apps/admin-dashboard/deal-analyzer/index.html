@@ -1,0 +1,2397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kanto Collect - Deal Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #1a1a25;
+            --bg-elevated: #22222f;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --success: #10b981;
+            --success-bg: rgba(16, 185, 129, 0.1);
+            --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.1);
+            --danger: #ef4444;
+            --danger-bg: rgba(239, 68, 68, 0.1);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: #2a2a3a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 16px;
+            padding-bottom: 100px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent), #a855f7);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-name {
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* Login Section */
+        .login-section {
+            max-width: 400px;
+            margin: 80px auto;
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 32px;
+            border: 1px solid var(--border);
+        }
+
+        .login-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .login-subtitle {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .label-hint {
+            font-weight: 400;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: 'Outfit', sans-serif;
+            transition: all 0.2s;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 500px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--accent-glow);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+        }
+
+        /* Tool Header */
+        .tool-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .tool-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .tool-subtitle {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        /* Card Sections */
+        .card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .card-icon {
+            font-size: 24px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .card-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Image Upload */
+        .upload-area {
+            display: block;
+            position: relative;
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-secondary);
+        }
+
+        .btn-secondary {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .upload-area:hover {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .upload-area.has-image {
+            padding: 0;
+            border-style: solid;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .upload-text {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .upload-hint {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .preview-container {
+            position: relative;
+        }
+
+        .preview-image {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 10px;
+        }
+
+        .preview-remove {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        /* Input Method Toggle */
+        .input-method-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .method-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .method-btn:hover {
+            border-color: var(--primary);
+            color: var(--text-primary);
+        }
+
+        .method-btn.active {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--primary);
+        }
+
+        /* Link Input Area */
+        .link-input-area {
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .link-input-area:focus-within {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .link-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .link-text {
+            font-size: 16px;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+        }
+
+        .url-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .fetch-btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 12px;
+        }
+
+        .fetch-btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        .fetch-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .link-hint {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Fetched Preview */
+        .fetched-preview {
+            margin-top: 20px;
+            background: var(--bg-elevated);
+            border-radius: 12px;
+            overflow: hidden;
+            text-align: left;
+        }
+
+        .fetched-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .fetched-source {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .fetched-clear {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .fetched-image {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+        }
+
+        .fetched-info {
+            padding: 16px;
+        }
+
+        .fetched-title {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .fetched-price {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--success);
+        }
+
+        /* Price Input */
+        .price-input-wrapper {
+            position: relative;
+        }
+
+        .price-input-wrapper::before {
+            content: '$';
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .price-input-wrapper input {
+            padding-left: 36px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        /* Results Section */
+        .results-section {
+            display: none;
+        }
+
+        .results-section.visible {
+            display: block;
+        }
+
+        /* Deal Verdict */
+        .verdict-card {
+            text-align: center;
+            padding: 32px;
+        }
+
+        .verdict-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .verdict-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .verdict-subtitle {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .verdict-card.good {
+            background: var(--success-bg);
+            border-color: var(--success);
+        }
+
+        .verdict-card.good .verdict-title {
+            color: var(--success);
+        }
+
+        .verdict-card.fair {
+            background: var(--warning-bg);
+            border-color: var(--warning);
+        }
+
+        .verdict-card.fair .verdict-title {
+            color: var(--warning);
+        }
+
+        .verdict-card.bad {
+            background: var(--danger-bg);
+            border-color: var(--danger);
+        }
+
+        .verdict-card.bad .verdict-title {
+            color: var(--danger);
+        }
+
+        /* Price Summary */
+        .price-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .price-box {
+            background: var(--bg-secondary);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .price-box-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .price-box-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .price-box-value.asking {
+            color: var(--text-secondary);
+        }
+
+        .price-box-value.market {
+            color: var(--accent);
+        }
+
+        .price-box-value.profit {
+            color: var(--success);
+        }
+
+        .price-box-value.loss {
+            color: var(--danger);
+        }
+
+        @media (max-width: 500px) {
+            .price-summary {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Detected Cards */
+        .cards-list {
+            margin-top: 16px;
+        }
+
+        .detected-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            margin-bottom: 12px;
+        }
+
+        .detected-card-info {
+            flex: 1;
+        }
+
+        .detected-card-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .detected-card-details {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .detected-card-price {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--success);
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        .confidence-high {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .confidence-medium {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .confidence-low {
+            background: var(--danger-bg);
+            color: var(--danger);
+        }
+
+        /* Confirmation Flow */
+        .detected-card.needs-confirmation {
+            background: var(--warning-bg);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .card-name-input {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .card-name-input:focus {
+            outline: none;
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* Card Image Confirmation Grid */
+        .card-confirmation-row {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .card-confirmation-row.needs-confirmation {
+            background: var(--warning-bg);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .card-position-badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .ai-detected-section {
+            flex: 0 0 200px;
+            position: relative;
+        }
+
+        .ai-detected-section .card-image-placeholder {
+            width: 100%;
+            aspect-ratio: 63/88;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed var(--border);
+            text-align: center;
+            padding: 12px;
+        }
+
+        .ai-detected-section .card-image-placeholder .emoji {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .ai-detected-section .card-image-placeholder .text {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .ai-detected-info {
+            padding: 12px 0;
+        }
+
+        .ai-detected-info .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .ai-detected-info .value {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .ai-attrs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .ai-attr {
+            padding: 3px 8px;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .card-matches-section {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-matches-section .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .card-matches-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 12px;
+        }
+
+        .card-match-option {
+            cursor: pointer;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg-elevated);
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .card-match-option:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .card-match-option.selected {
+            border-color: var(--success);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        .card-match-option img {
+            width: 100%;
+            aspect-ratio: 63/88;
+            object-fit: cover;
+            display: block;
+        }
+
+        .card-match-option .match-info {
+            padding: 6px 8px;
+            font-size: 11px;
+        }
+
+        .card-match-option .match-name {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-match-option .match-number {
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        .card-match-option .match-score {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 9px;
+            margin-top: 4px;
+        }
+
+        .loading-matches {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .loading-matches .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        .no-matches {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .manual-input-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .manual-input-section input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .manual-input-section input::placeholder {
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 600px) {
+            .card-confirmation-row {
+                flex-direction: column;
+            }
+            
+            .ai-detected-section {
+                flex: none;
+                display: flex;
+                gap: 12px;
+            }
+            
+            .ai-detected-section .card-image-placeholder {
+                width: 100px;
+                flex-shrink: 0;
+            }
+            
+            .card-matches-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        /* Negotiation Tips */
+        .negotiation-tips {
+            margin-top: 16px;
+        }
+
+        .tip-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .tip-icon {
+            font-size: 20px;
+        }
+
+        .tip-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .tip-text strong {
+            color: var(--text-primary);
+        }
+
+        /* Quick Lookup */
+        .quick-lookup {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .quick-lookup-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+        }
+
+        .quick-lookup-form {
+            display: flex;
+            gap: 12px;
+        }
+
+        .quick-lookup-form input {
+            flex: 1;
+        }
+
+        .quick-lookup-form button {
+            width: auto;
+            padding: 14px 24px;
+        }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 10, 15, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-overlay.visible {
+            display: flex;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        .loading-text {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .loading-subtext {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Error */
+        .error-msg {
+            background: var(--danger-bg);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 14px;
+            border-radius: 10px;
+            margin-top: 16px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .tab.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Section -->
+        <div id="login-section" class="login-section">
+            <div class="login-card">
+                <div class="login-title">🎴 Kanto Collect</div>
+                <div class="login-subtitle">Deal Analyzer</div>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="username" placeholder="cihan" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="login-btn">Sign In</button>
+                </form>
+                <div id="login-error" class="error-msg hidden"></div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="app-section" class="hidden">
+            <!-- Header -->
+            <div class="header">
+                <div class="logo">🎴 Kanto Collect</div>
+                <div class="user-menu">
+                    <div class="user-avatar" id="user-avatar">C</div>
+                    <span class="user-name" id="user-name">Cihan</span>
+                    <button class="logout-btn" onclick="logout()">Sign Out</button>
+                </div>
+            </div>
+
+            <!-- Tool Header -->
+            <div class="tool-header">
+                <h1 class="tool-title">Deal Analyzer</h1>
+                <p class="tool-subtitle">Upload photos, get instant valuations, negotiate better deals</p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('analyze')">📷 Analyze Deal</div>
+                <div class="tab" onclick="switchTab('lookup')">🔍 Quick Lookup</div>
+                <div class="tab" onclick="switchTab('history')">📋 History</div>
+            </div>
+
+            <!-- Analyze Deal Tab -->
+            <div id="analyze-tab" class="tab-content active">
+                <!-- Image Upload -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">📷</span>
+                        <div>
+                            <div class="card-title">Upload Photos</div>
+                            <div class="card-subtitle">Take or upload photos of the cards/lot</div>
+                        </div>
+                    </div>
+                    <!-- Input Method Toggle -->
+                    <div class="input-method-toggle">
+                        <button type="button" class="method-btn active" data-method="upload" onclick="switchInputMethod('upload')">
+                            📷 Upload Image
+                        </button>
+                        <button type="button" class="method-btn" data-method="link" onclick="switchInputMethod('link')">
+                            🔗 Paste Link
+                        </button>
+                    </div>
+                    
+                    <!-- Upload Method -->
+                    <div class="upload-area" id="upload-area">
+                        <div id="upload-placeholder">
+                            <div class="upload-icon">📸</div>
+                            <div class="upload-text">Select an image</div>
+                            <input type="file" id="file-input" accept="image/*" style="margin: 16px auto; display: block;">
+                            <div class="upload-hint">Or drag & drop • Max 10MB</div>
+                        </div>
+                        <div id="preview-container" class="preview-container hidden">
+                            <img id="preview-image" class="preview-image" src="" alt="Preview">
+                            <button type="button" class="preview-remove" id="remove-image-btn">×</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Link Method -->
+                    <div class="link-input-area hidden" id="link-input-area">
+                        <div class="link-icon">🔗</div>
+                        <div class="link-text">Paste eBay or Facebook Marketplace Link</div>
+                        <input type="url" id="listing-url" class="url-input" placeholder="https://www.ebay.com/itm/... or https://www.facebook.com/marketplace/...">
+                        <button type="button" class="fetch-btn" onclick="fetchFromLink()">
+                            <span id="fetch-btn-text">🔍 Fetch Listing</span>
+                        </button>
+                        <div class="link-hint">We'll extract photos, price, and description automatically</div>
+                        
+                        <!-- Fetched Preview -->
+                        <div id="fetched-preview" class="fetched-preview hidden">
+                            <div class="fetched-header">
+                                <span class="fetched-source" id="fetched-source">eBay</span>
+                                <button type="button" class="fetched-clear" onclick="clearFetchedData()">×</button>
+                            </div>
+                            <img id="fetched-image" class="fetched-image" src="" alt="Listing Image">
+                            <div class="fetched-info">
+                                <div class="fetched-title" id="fetched-title">-</div>
+                                <div class="fetched-price" id="fetched-price">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deal Details -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">💰</span>
+                        <div>
+                            <div class="card-title">Deal Details</div>
+                            <div class="card-subtitle">Enter the seller's asking price</div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Asking Price</label>
+                            <div class="price-input-wrapper">
+                                <input type="number" id="asking-price" placeholder="0.00" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="category">
+                                <option value="one-piece">One Piece TCG</option>
+                                <option value="pokemon">Pokémon TCG</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Expected Card Count <span class="label-hint">(How many cards are in the lot?)</span></label>
+                            <input type="number" id="expected-count" placeholder="e.g., 15" min="1" max="500">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description (Optional)</label>
+                        <textarea id="deal-description" rows="2" placeholder="e.g., 'Lot of 20 One Piece cards, mostly common'"></textarea>
+                    </div>
+                    <button class="btn btn-success" id="analyze-btn" onclick="analyzeDeal()">
+                        🔍 Analyze Deal
+                    </button>
+                </div>
+
+                <!-- Results Section -->
+                <div id="results-section" class="results-section">
+                    <!-- Verdict -->
+                    <div class="card verdict-card" id="verdict-card">
+                        <div class="verdict-icon" id="verdict-icon">✅</div>
+                        <div class="verdict-title" id="verdict-title">Great Deal!</div>
+                        <div class="verdict-subtitle" id="verdict-subtitle">This lot is priced below market value</div>
+                        
+                        <div class="price-summary">
+                            <div class="price-box">
+                                <div class="price-box-label">Asking Price</div>
+                                <div class="price-box-value asking" id="summary-asking">$0</div>
+                            </div>
+                            <div class="price-box">
+                                <div class="price-box-label">Market Value</div>
+                                <div class="price-box-value market" id="summary-market">$0</div>
+                            </div>
+                            <div class="price-box">
+                                <div class="price-box-label">Potential Profit</div>
+                                <div class="price-box-value profit" id="summary-profit">$0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detected Cards -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-icon">🃏</span>
+                            <div>
+                                <div class="card-title">Detected Cards</div>
+                                <div class="card-subtitle" id="cards-count">0 cards identified</div>
+                            </div>
+                        </div>
+                        <div class="cards-list" id="cards-list">
+                            <!-- Cards will be inserted here -->
+                        </div>
+                    </div>
+
+                    <!-- Negotiation Tips -->
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-icon">🤝</span>
+                            <div>
+                                <div class="card-title">Negotiation Tips</div>
+                                <div class="card-subtitle">How to approach this deal</div>
+                            </div>
+                        </div>
+                        <div class="negotiation-tips" id="negotiation-tips">
+                            <!-- Tips will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Lookup Tab -->
+            <div id="lookup-tab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">🔍</span>
+                        <div>
+                            <div class="card-title">Quick Price Lookup</div>
+                            <div class="card-subtitle">Search for individual card prices</div>
+                        </div>
+                    </div>
+                    <form id="lookup-form" onsubmit="lookupPrice(event)">
+                        <div class="form-group">
+                            <label>Card/Product Name</label>
+                            <input type="text" id="lookup-name" placeholder="e.g., Roronoa Zoro OP06-118" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="lookup-btn">Look Up Price</button>
+                    </form>
+                    <div id="lookup-result" class="hidden" style="margin-top: 20px;">
+                        <!-- Result will be inserted here -->
+                    </div>
+                    <div id="lookup-error" class="error-msg hidden"></div>
+                </div>
+            </div>
+
+            <!-- History Tab -->
+            <div id="history-tab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">📋</span>
+                        <div>
+                            <div class="card-title">Recent Analyses</div>
+                            <div class="card-subtitle">Your deal analysis history</div>
+                        </div>
+                    </div>
+                    <div id="history-list">
+                        <p style="color: var(--text-secondary); text-align: center; padding: 40px 20px;">
+                            No analyses yet. Start by analyzing a deal!
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" id="loading-text">Analyzing your deal...</div>
+            <div class="loading-subtext" id="loading-subtext">AI is detecting cards in your image</div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8000' 
+            : window.location.origin;
+
+        // State
+        let token = localStorage.getItem('kanto_token');
+        let user = JSON.parse(localStorage.getItem('kanto_user') || 'null');
+        let selectedImage = null;
+        let analysisHistory = JSON.parse(localStorage.getItem('kanto_analysis_history') || '[]');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            if (token && user) {
+                showApp();
+            }
+            setupDragDrop();
+        });
+
+        // Login
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const btn = document.getElementById('login-btn');
+            const errorEl = document.getElementById('login-error');
+
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            errorEl.classList.add('hidden');
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append('username', username);
+                formData.append('password', password);
+
+                const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Invalid credentials');
+                }
+
+                const data = await response.json();
+                token = data.access_token;
+                localStorage.setItem('kanto_token', token);
+
+                // Get user info
+                const userResponse = await fetch(`${API_BASE}/api/v1/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                user = await userResponse.json();
+                localStorage.setItem('kanto_user', JSON.stringify(user));
+
+                showApp();
+            } catch (error) {
+                errorEl.textContent = error.message || 'Login failed';
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        });
+
+        function showApp() {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('app-section').classList.remove('hidden');
+            
+            if (user) {
+                document.getElementById('user-name').textContent = user.full_name || user.email;
+                document.getElementById('user-avatar').textContent = (user.full_name || user.email)[0].toUpperCase();
+            }
+        }
+
+        function logout() {
+            token = null;
+            user = null;
+            localStorage.removeItem('kanto_token');
+            localStorage.removeItem('kanto_user');
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('app-section').classList.add('hidden');
+        }
+
+        // Tab Switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', 
+                    (tabName === 'analyze' && i === 0) ||
+                    (tabName === 'lookup' && i === 1) ||
+                    (tabName === 'history' && i === 2)
+                );
+            });
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        // Input Method Toggle (Upload vs Link)
+        let currentInputMethod = 'upload';
+        let fetchedListingData = null;
+
+        function switchInputMethod(method) {
+            currentInputMethod = method;
+            
+            // Update button states
+            document.querySelectorAll('.method-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.method === method);
+            });
+            
+            // Show/hide areas
+            const uploadArea = document.getElementById('upload-area');
+            const linkArea = document.getElementById('link-input-area');
+            
+            if (method === 'upload') {
+                uploadArea.classList.remove('hidden');
+                linkArea.classList.add('hidden');
+            } else {
+                uploadArea.classList.add('hidden');
+                linkArea.classList.remove('hidden');
+            }
+        }
+
+        async function fetchFromLink() {
+            const urlInput = document.getElementById('listing-url');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                alert('Please enter a listing URL');
+                return;
+            }
+            
+            // Validate URL
+            if (!url.includes('ebay.com') && !url.includes('facebook.com/marketplace')) {
+                alert('Please enter a valid eBay or Facebook Marketplace URL');
+                return;
+            }
+            
+            const fetchBtn = document.querySelector('.fetch-btn');
+            const fetchBtnText = document.getElementById('fetch-btn-text');
+            
+            fetchBtn.disabled = true;
+            fetchBtnText.textContent = '⏳ Fetching...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/admin/deal-analyzer/fetch-listing`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to fetch listing');
+                }
+                
+                const data = await response.json();
+                fetchedListingData = data;
+                
+                // Show fetched preview
+                const preview = document.getElementById('fetched-preview');
+                const source = document.getElementById('fetched-source');
+                const image = document.getElementById('fetched-image');
+                const title = document.getElementById('fetched-title');
+                const price = document.getElementById('fetched-price');
+                
+                source.textContent = data.source || 'Listing';
+                image.src = data.image_url || '';
+                image.style.display = data.image_url ? 'block' : 'none';
+                title.textContent = data.title || 'No title found';
+                price.textContent = data.price ? `$${data.price}` : 'Price not found';
+                
+                preview.classList.remove('hidden');
+                
+                // Auto-fill asking price if found
+                if (data.price) {
+                    document.getElementById('asking-price').value = data.price;
+                }
+                
+                // Auto-fill description
+                if (data.description) {
+                    document.getElementById('deal-description').value = data.description;
+                }
+                
+            } catch (error) {
+                console.error('Fetch error:', error);
+                alert('Error fetching listing: ' + error.message);
+            } finally {
+                fetchBtn.disabled = false;
+                fetchBtnText.textContent = '🔍 Fetch Listing';
+            }
+        }
+
+        function clearFetchedData() {
+            fetchedListingData = null;
+            document.getElementById('fetched-preview').classList.add('hidden');
+            document.getElementById('listing-url').value = '';
+        }
+
+        // Drag & Drop and Click to Upload
+        function setupDragDrop() {
+            const area = document.getElementById('upload-area');
+            const fileInput = document.getElementById('file-input');
+            const chooseBtn = document.getElementById('choose-file-btn');
+            const removeBtn = document.getElementById('remove-image-btn');
+            
+            if (!area || !fileInput) {
+                console.error('Upload elements not found');
+                return;
+            }
+            
+            // Choose File button click
+            if (chooseBtn) {
+                chooseBtn.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    fileInput.click();
+                };
+            }
+            
+            // Remove image button click
+            if (removeBtn) {
+                removeBtn.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    removeImage(e);
+                };
+            }
+            
+            // File input change
+            fileInput.onchange = function(e) {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            };
+            
+            // Drag events
+            area.ondragenter = preventDefaults;
+            area.ondragover = function(e) {
+                preventDefaults(e);
+                area.classList.add('dragover');
+            };
+            area.ondragleave = function(e) {
+                preventDefaults(e);
+                area.classList.remove('dragover');
+            };
+            area.ondrop = function(e) {
+                preventDefaults(e);
+                area.classList.remove('dragover');
+                handleDrop(e);
+            };
+            
+            console.log('Upload handlers attached successfully');
+        }
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleDrop(e) {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        // Removed - now handled in setupDragDrop()
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                alert('Image too large. Max 10MB');
+                return;
+            }
+
+            selectedImage = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('preview-image').src = e.target.result;
+                document.getElementById('upload-placeholder').classList.add('hidden');
+                document.getElementById('preview-container').classList.remove('hidden');
+                document.getElementById('upload-area').classList.add('has-image');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeImage(e) {
+            e.stopPropagation();
+            selectedImage = null;
+            document.getElementById('preview-image').src = '';
+            document.getElementById('upload-placeholder').classList.remove('hidden');
+            document.getElementById('preview-container').classList.add('hidden');
+            document.getElementById('upload-area').classList.remove('has-image');
+            document.getElementById('file-input').value = '';
+        }
+
+        // Analyze Deal
+        async function analyzeDeal() {
+            const askingPrice = parseFloat(document.getElementById('asking-price').value) || 0;
+            const category = document.getElementById('category').value;
+            const description = document.getElementById('deal-description').value;
+            const expectedCount = parseInt(document.getElementById('expected-count').value) || 0;
+
+            // Check if we have any input (image, link data, or description)
+            const hasInput = selectedImage || fetchedListingData || description;
+            
+            if (!hasInput) {
+                alert('Please upload an image, paste a listing link, or enter a description');
+                return;
+            }
+
+            showLoading('Analyzing your deal...', `AI is detecting ${expectedCount > 0 ? expectedCount : 'all'} cards in your image`);
+
+            try {
+                const formData = new FormData();
+                
+                // Add image from upload OR from fetched listing
+                if (selectedImage) {
+                    formData.append('image', selectedImage);
+                } else if (fetchedListingData && fetchedListingData.image_url) {
+                    formData.append('image_url', fetchedListingData.image_url);
+                }
+                
+                // Add other fields
+                formData.append('asking_price', askingPrice);
+                formData.append('category', category);
+                formData.append('expected_count', expectedCount);
+                
+                // Combine description with fetched data
+                let fullDescription = description;
+                if (fetchedListingData) {
+                    fullDescription = `[From ${fetchedListingData.source}] ${fetchedListingData.title || ''}\n${description}`.trim();
+                }
+                formData.append('description', fullDescription);
+
+                const response = await fetch(`${API_BASE}/api/v1/admin/deal-analyzer/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Analysis failed');
+                }
+
+                const result = await response.json();
+                displayResults(result, askingPrice);
+                addToHistory(result, askingPrice);
+
+            } catch (error) {
+                hideLoading();
+                console.error('Analysis error:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function showMockResults(askingPrice, description) {
+            // Demo results until AI is integrated
+            const mockResult = {
+                cards: [
+                    {
+                        name: 'Roronoa Zoro [Alternate Art]',
+                        set: 'OP-06 Wings of the Captain',
+                        number: 'OP06-118',
+                        language: 'English',
+                        variant: 'Manga Art',
+                        price: 150.00,
+                        confidence: 85
+                    },
+                    {
+                        name: 'Monkey D. Luffy',
+                        set: 'OP-01 Romance Dawn',
+                        number: 'OP01-003',
+                        language: 'English',
+                        variant: 'Standard',
+                        price: 2.50,
+                        confidence: 92
+                    }
+                ],
+                total_value: 152.50,
+                note: 'Demo mode - AI integration coming soon'
+            };
+            displayResults(mockResult, askingPrice);
+            hideLoading();
+        }
+
+        // Store last analysis result for confirmation flow
+        let lastAnalysisResult = null;
+
+        function displayResults(result, askingPrice) {
+            hideLoading();
+            lastAnalysisResult = result;
+            
+            // Check if we need user confirmation
+            if (result.needs_user_confirmation) {
+                displayConfirmationUI(result, askingPrice);
+                return;
+            }
+            
+            displayFinalResults(result, askingPrice);
+        }
+
+        // Store selected cards for each position
+        let selectedCards = {};
+
+        function displayConfirmationUI(result, askingPrice) {
+            const totalDetected = result.total_cards_detected || result.cards.length;
+            const needsConf = result.cards_needing_confirmation || 0;
+            
+            // Reset selected cards
+            selectedCards = {};
+            
+            // Build confirmation UI
+            const verdictCard = document.getElementById('verdict-card');
+            verdictCard.className = 'card verdict-card';
+            verdictCard.style.background = 'linear-gradient(145deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05))';
+            verdictCard.style.borderColor = 'var(--warning)';
+            
+            document.getElementById('verdict-icon').textContent = '🔍';
+            document.getElementById('verdict-title').textContent = 'Confirm Cards';
+            document.getElementById('verdict-subtitle').textContent = 
+                `AI detected ${totalDetected} cards. Review and confirm each one.`;
+
+            // Show card count summary
+            document.getElementById('summary-asking').textContent = totalDetected.toString();
+            document.querySelector('.price-box:nth-child(1) .price-box-label').textContent = 'Detected';
+            document.getElementById('summary-market').textContent = '0';
+            document.querySelector('.price-box:nth-child(2) .price-box-label').textContent = 'Confirmed';
+            document.getElementById('summary-profit').textContent = totalDetected.toString();
+            document.getElementById('summary-profit').className = 'price-box-value loss';
+            document.querySelector('.price-box:nth-child(3) .price-box-label').textContent = 'Pending';
+
+            // Build cards list with images
+            const cardsList = document.getElementById('cards-list');
+            document.getElementById('cards-count').textContent = `Review and confirm each card`;
+            
+            cardsList.innerHTML = result.cards.map((card, index) => `
+                <div class="card-confirmation-row ${card.needs_confirmation || card.confidence < 80 ? 'needs-confirmation' : ''}" data-index="${index}">
+                    <!-- AI Detected Info -->
+                    <div class="ai-detected-section">
+                        <div class="card-position-badge">#${index + 1}</div>
+                        <div class="card-image-placeholder">
+                            <div class="emoji">🎴</div>
+                            <div class="text">AI detected this card</div>
+                        </div>
+                        <div class="ai-detected-info">
+                            <div class="label">AI Says:</div>
+                            <div class="value" style="color: ${card.confidence >= 80 ? 'var(--text-primary)' : 'var(--warning)'};">
+                                ${card.name || 'Unknown'}
+                                ${card.confidence < 80 ? ' ⚠️' : ''}
+                            </div>
+                            <div class="ai-attrs">
+                                ${card.color ? `<span class="ai-attr" style="background: ${getColorStyle(card.color)}22; color: ${getColorStyle(card.color)};">${card.color}</span>` : ''}
+                                ${card.cost !== undefined && card.cost !== null ? `<span class="ai-attr">Cost: ${card.cost}</span>` : ''}
+                                ${card.power !== undefined && card.power !== null ? `<span class="ai-attr">Power: ${card.power}</span>` : ''}
+                            </div>
+                            ${card.visible_details ? `
+                                <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                                    ${card.visible_details}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- Matching Cards Section -->
+                    <div class="card-matches-section">
+                        <div class="section-title">
+                            ${card.confidence >= 80 ? '✓ Click to confirm or select a different match:' : '⚠️ Select the correct card:'}
+                        </div>
+                        <div class="card-matches-grid" id="matches-grid-${index}">
+                            <div class="loading-matches">
+                                <div class="spinner"></div>
+                                Searching for matches...
+                            </div>
+                        </div>
+                        <div class="manual-input-section">
+                            <input type="text" 
+                                   id="manual-input-${index}"
+                                   placeholder="Or type card name/number (e.g., OP01-001 or Luffy)"
+                                   onchange="handleManualInput(${index}, this.value)">
+                        </div>
+                    </div>
+                </div>
+            `).join('') + `
+                <div style="margin-top: 20px; padding: 16px; background: var(--bg-secondary); border-radius: 12px;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">➕ Missing cards?</div>
+                    <textarea id="additional-cards" 
+                              placeholder="Enter additional card names, one per line&#10;e.g., Kaido OP04-044&#10;Brook OP01-077"
+                              style="width: 100%; padding: 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); font-size: 14px; min-height: 80px; resize: vertical;"></textarea>
+                </div>
+            `;
+
+            // Fetch card images for each detected card
+            result.cards.forEach((card, index) => {
+                fetchCardMatches(index, card);
+            });
+
+            // Update negotiation tips
+            document.getElementById('negotiation-tips').innerHTML = `
+                <div class="tip-item">
+                    <span class="tip-icon">👆</span>
+                    <span class="tip-text"><strong>Click</strong> on a card image to select it as the correct match.</span>
+                </div>
+                <div class="tip-item">
+                    <span class="tip-icon">⌨️</span>
+                    <span class="tip-text">Or <strong>type</strong> the card number if you know it (e.g., OP01-001).</span>
+                </div>
+                <div class="tip-item">
+                    <span class="tip-icon">✅</span>
+                    <span class="tip-text">Click <strong>Confirm & Get Prices</strong> when done reviewing.</span>
+                </div>
+            `;
+
+            // Add confirm button
+            const tipsSection = document.getElementById('negotiation-tips');
+            let confirmBtn = document.getElementById('confirm-cards-btn');
+            if (!confirmBtn && tipsSection) {
+                confirmBtn = document.createElement('button');
+                confirmBtn.id = 'confirm-cards-btn';
+                confirmBtn.className = 'btn btn-primary';
+                confirmBtn.style.marginTop = '16px';
+                confirmBtn.innerHTML = '✅ Confirm & Get Prices';
+                confirmBtn.onclick = confirmCardsAndGetPrices;
+                tipsSection.appendChild(confirmBtn);
+            }
+
+            // Show results
+            document.getElementById('results-section').classList.add('visible');
+        }
+
+        async function fetchCardMatches(index, card) {
+            const gridEl = document.getElementById(`matches-grid-${index}`);
+            if (!gridEl) return;
+
+            try {
+                // Build query params
+                const params = new URLSearchParams();
+                if (card.name && card.name !== 'Unknown' && card.name !== 'Unknown Card') {
+                    params.append('name', card.name.replace('(?)', '').trim());
+                }
+                if (card.card_number) {
+                    params.append('card_number', card.card_number);
+                }
+                if (card.cost !== undefined && card.cost !== null) {
+                    params.append('cost', card.cost);
+                }
+                if (card.power !== undefined && card.power !== null) {
+                    params.append('power', card.power);
+                }
+                if (card.color) {
+                    params.append('color', card.color.split('/')[0]); // Take first color
+                }
+
+                const response = await fetch(`${API_BASE}/api/v1/admin/cards/images/search?${params}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch matches');
+
+                const data = await response.json();
+                
+                if (data.matches && data.matches.length > 0) {
+                    gridEl.innerHTML = data.matches.map((match, matchIndex) => `
+                        <div class="card-match-option ${matchIndex === 0 ? 'selected' : ''}" 
+                             data-card-index="${index}"
+                             data-match-index="${matchIndex}"
+                             data-card-name="${match.name}"
+                             data-card-number="${match.card_number || ''}"
+                             onclick="selectCardMatch(${index}, ${matchIndex}, this)">
+                            <img src="${match.image_url || ''}" 
+                                 alt="${match.name}"
+                                 onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 63 88%22><rect fill=%22%231a1a25%22 width=%2263%22 height=%2288%22/><text x=%2232%22 y=%2244%22 text-anchor=%22middle%22 fill=%22%2364748b%22 font-size=%228%22>No Image</text></svg>'">
+                            <div class="match-info">
+                                <div class="match-name">${match.name}</div>
+                                <div class="match-number">${match.card_number || ''}</div>
+                                ${match.match_score ? `<span class="match-score">${match.match_score}% match</span>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    // Auto-select first match
+                    if (data.matches[0]) {
+                        selectedCards[index] = {
+                            name: data.matches[0].name,
+                            card_number: data.matches[0].card_number,
+                        };
+                        updateConfirmationCount();
+                    }
+                } else {
+                    gridEl.innerHTML = `
+                        <div class="no-matches">
+                            No matches found. Please type the card name below.
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error fetching card matches:', error);
+                gridEl.innerHTML = `
+                    <div class="no-matches">
+                        Could not fetch matches. Please type the card name below.
+                    </div>
+                `;
+            }
+        }
+
+        function selectCardMatch(cardIndex, matchIndex, element) {
+            // Deselect all in this grid
+            const grid = element.parentElement;
+            grid.querySelectorAll('.card-match-option').forEach(opt => opt.classList.remove('selected'));
+            
+            // Select clicked one
+            element.classList.add('selected');
+            
+            // Store selection
+            selectedCards[cardIndex] = {
+                name: element.dataset.cardName,
+                card_number: element.dataset.cardNumber,
+            };
+            
+            // Clear manual input
+            const manualInput = document.getElementById(`manual-input-${cardIndex}`);
+            if (manualInput) manualInput.value = '';
+            
+            updateConfirmationCount();
+        }
+
+        function handleManualInput(cardIndex, value) {
+            if (value.trim()) {
+                // Deselect grid options
+                const grid = document.getElementById(`matches-grid-${cardIndex}`);
+                if (grid) {
+                    grid.querySelectorAll('.card-match-option').forEach(opt => opt.classList.remove('selected'));
+                }
+                
+                // Store manual input
+                selectedCards[cardIndex] = {
+                    name: value.trim(),
+                    card_number: value.trim().toUpperCase().match(/OP\d{2}-\d{3}/)?.[0] || '',
+                };
+                
+                updateConfirmationCount();
+            }
+        }
+
+        function updateConfirmationCount() {
+            const totalCards = lastAnalysisResult?.cards?.length || 0;
+            const confirmedCount = Object.keys(selectedCards).length;
+            
+            document.getElementById('summary-market').textContent = confirmedCount.toString();
+            document.getElementById('summary-profit').textContent = (totalCards - confirmedCount).toString();
+            document.getElementById('summary-profit').className = 'price-box-value ' + (totalCards - confirmedCount > 0 ? 'loss' : 'profit');
+        }
+
+        async function confirmCardsAndGetPrices() {
+            if (!lastAnalysisResult) return;
+
+            // Collect confirmed card names from selections
+            const confirmedNames = [];
+            
+            // First, add all selected cards
+            Object.values(selectedCards).forEach(card => {
+                if (card.name) {
+                    // If we have a card number, use it for better lookup
+                    const cardRef = card.card_number ? `${card.name} ${card.card_number}` : card.name;
+                    confirmedNames.push(cardRef);
+                }
+            });
+
+            // Add cards that weren't selected but had manual input
+            document.querySelectorAll('[id^="manual-input-"]').forEach(input => {
+                const index = parseInt(input.id.split('-').pop());
+                if (!selectedCards[index] && input.value.trim()) {
+                    confirmedNames.push(input.value.trim());
+                }
+            });
+
+            // Add any cards from AI that had high confidence but weren't in selectedCards
+            lastAnalysisResult.cards.forEach((card, index) => {
+                if (!selectedCards[index] && card.confidence >= 90 && card.name !== 'Unknown Card') {
+                    confirmedNames.push(card.name);
+                }
+            });
+
+            // Add additional cards from textarea
+            const additionalCards = document.getElementById('additional-cards')?.value;
+            if (additionalCards) {
+                additionalCards.split('\n').forEach(line => {
+                    const name = line.trim();
+                    if (name && name.length > 2) {
+                        confirmedNames.push(name);
+                    }
+                });
+            }
+
+            if (confirmedNames.length === 0) {
+                alert('Please select or enter at least one card');
+                return;
+            }
+
+            // Re-analyze with confirmed card names (text-only mode - FREE)
+            const askingPrice = parseFloat(document.getElementById('asking-price').value) || 0;
+            const category = document.getElementById('category').value;
+
+            showLoading('Getting prices...', `Looking up ${confirmedNames.length} confirmed cards`);
+
+            try {
+                const formData = new FormData();
+                formData.append('description', confirmedNames.join(', '));
+                formData.append('asking_price', askingPrice);
+                formData.append('category', category);
+
+                const response = await fetch(`${API_BASE}/api/v1/admin/deal-analyzer/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Analysis failed');
+                }
+
+                const result = await response.json();
+                // Force show final results (skip confirmation)
+                result.needs_user_confirmation = false;
+                displayFinalResults(result, askingPrice);
+                addToHistory(result, askingPrice);
+
+            } catch (error) {
+                hideLoading();
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function displayFinalResults(result, askingPrice) {
+            // Reset labels
+            document.querySelector('.price-box:nth-child(1) .price-box-label').textContent = 'Asking Price';
+            document.querySelector('.price-box:nth-child(2) .price-box-label').textContent = 'Market Value';
+            document.querySelector('.price-box:nth-child(3) .price-box-label').textContent = 'Potential Profit';
+            
+            // Remove confirm button if exists
+            const confirmBtn = document.getElementById('confirm-cards-btn');
+            if (confirmBtn) confirmBtn.remove();
+
+            const totalValue = result.total_value || result.cards.reduce((sum, c) => sum + c.price, 0);
+            const profit = totalValue - askingPrice;
+            const profitPercent = askingPrice > 0 ? ((profit / askingPrice) * 100).toFixed(0) : 0;
+
+            // Determine verdict
+            let verdict, icon, subtitle, cardClass;
+            if (askingPrice === 0) {
+                verdict = 'Enter Asking Price';
+                icon = '💰';
+                subtitle = 'Add the asking price to see if it\'s a good deal';
+                cardClass = '';
+            } else if (profit > totalValue * 0.2) {
+                verdict = 'Great Deal!';
+                icon = '🎉';
+                subtitle = `${profitPercent}% below market value`;
+                cardClass = 'good';
+            } else if (profit > 0) {
+                verdict = 'Fair Deal';
+                icon = '👍';
+                subtitle = `${profitPercent}% below market value`;
+                cardClass = 'fair';
+            } else {
+                verdict = 'Overpriced';
+                icon = '⚠️';
+                subtitle = `${Math.abs(profitPercent)}% above market value`;
+                cardClass = 'bad';
+            }
+
+            // Update verdict card
+            const verdictCard = document.getElementById('verdict-card');
+            verdictCard.className = 'card verdict-card ' + cardClass;
+            verdictCard.style.background = '';
+            verdictCard.style.borderColor = '';
+            document.getElementById('verdict-icon').textContent = icon;
+            document.getElementById('verdict-title').textContent = verdict;
+            document.getElementById('verdict-subtitle').textContent = subtitle;
+
+            // Update price summary
+            document.getElementById('summary-asking').textContent = '$' + askingPrice.toFixed(2);
+            document.getElementById('summary-market').textContent = '$' + totalValue.toFixed(2);
+            
+            const profitEl = document.getElementById('summary-profit');
+            profitEl.textContent = (profit >= 0 ? '+$' : '-$') + Math.abs(profit).toFixed(2);
+            profitEl.className = 'price-box-value ' + (profit >= 0 ? 'profit' : 'loss');
+
+            // Update cards list
+            const cardsList = document.getElementById('cards-list');
+            document.getElementById('cards-count').textContent = `${result.cards.length} cards identified`;
+            
+            cardsList.innerHTML = result.cards.map(card => `
+                <div class="detected-card">
+                    <div class="detected-card-info">
+                        <div class="detected-card-name">
+                            ${card.name}
+                            <span class="confidence-badge ${getConfidenceClass(card.confidence)}">
+                                ${card.confidence}%
+                            </span>
+                        </div>
+                        <div class="detected-card-details">
+                            ${card.set || ''} ${card.number ? '• ' + card.number : ''} ${card.variant ? '• ' + card.variant : ''}
+                        </div>
+                        ${(card.cost !== undefined || card.power !== undefined || card.color) ? `
+                            <div class="detected-card-attrs" style="margin-top: 4px; font-size: 12px; color: var(--text-muted);">
+                                ${card.color ? `<span style="color: ${getColorStyle(card.color)}; font-weight: 500;">${card.color}</span>` : ''}
+                                ${card.cost !== undefined ? `• Cost: ${card.cost}` : ''}
+                                ${card.power !== undefined ? `• Power: ${card.power}` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="detected-card-price">${card.price !== undefined ? '$' + card.price.toFixed(2) : '—'}</div>
+                </div>
+            `).join('');
+
+            // Update negotiation tips
+            const tips = generateNegotiationTips(askingPrice, totalValue, profit, result.cards);
+            document.getElementById('negotiation-tips').innerHTML = tips.map(tip => `
+                <div class="tip-item">
+                    <span class="tip-icon">${tip.icon}</span>
+                    <span class="tip-text">${tip.text}</span>
+                </div>
+            `).join('');
+
+            // Show results
+            document.getElementById('results-section').classList.add('visible');
+        }
+
+        function getConfidenceClass(confidence) {
+            if (confidence >= 80) return 'confidence-high';
+            if (confidence >= 60) return 'confidence-medium';
+            return 'confidence-low';
+        }
+
+        function getColorStyle(color) {
+            // Map One Piece TCG colors to visual colors
+            const colorMap = {
+                'red': '#ef4444',
+                'blue': '#3b82f6',
+                'green': '#10b981',
+                'purple': '#8b5cf6',
+                'black': '#64748b',
+                'yellow': '#eab308'
+            };
+            
+            if (!color) return 'inherit';
+            const lowerColor = color.toLowerCase();
+            
+            // Handle multi-color cards
+            for (const [key, value] of Object.entries(colorMap)) {
+                if (lowerColor.includes(key)) return value;
+            }
+            
+            return 'var(--text-primary)';
+        }
+
+        function generateNegotiationTips(asking, market, profit, cards) {
+            const tips = [];
+            
+            if (asking === 0) {
+                tips.push({
+                    icon: '💡',
+                    text: 'Enter the asking price to get negotiation tips'
+                });
+                return tips;
+            }
+
+            if (profit > market * 0.3) {
+                tips.push({
+                    icon: '🔥',
+                    text: `<strong>Buy it!</strong> This is significantly underpriced. Act fast.`
+                });
+            } else if (profit > market * 0.1) {
+                tips.push({
+                    icon: '✅',
+                    text: `<strong>Good deal.</strong> Fair to slightly below market. Consider buying.`
+                });
+            } else if (profit > 0) {
+                tips.push({
+                    icon: '🤔',
+                    text: `<strong>Marginal deal.</strong> Try offering <strong>$${(asking * 0.85).toFixed(0)}</strong> (-15%).`
+                });
+            } else {
+                const offerPrice = Math.floor(market * 0.8);
+                tips.push({
+                    icon: '📉',
+                    text: `<strong>Overpriced.</strong> Market value is $${market.toFixed(0)}. Offer <strong>$${offerPrice}</strong>.`
+                });
+            }
+
+            // Add card-specific tips
+            const highValueCards = cards.filter(c => c.price > 50);
+            if (highValueCards.length > 0) {
+                tips.push({
+                    icon: '💎',
+                    text: `<strong>${highValueCards.length} high-value card(s)</strong> detected. Verify condition carefully.`
+                });
+            }
+
+            const lowConfidence = cards.filter(c => c.confidence < 70);
+            if (lowConfidence.length > 0) {
+                tips.push({
+                    icon: '⚠️',
+                    text: `<strong>${lowConfidence.length} card(s)</strong> have low confidence. Manual verification recommended.`
+                });
+            }
+
+            return tips;
+        }
+
+        function addToHistory(result, askingPrice) {
+            const item = {
+                timestamp: new Date().toISOString(),
+                asking_price: askingPrice,
+                total_value: result.total_value || result.cards.reduce((sum, c) => sum + c.price, 0),
+                cards_count: result.cards.length,
+                verdict: askingPrice > 0 ? (result.total_value > askingPrice * 1.2 ? 'good' : result.total_value > askingPrice ? 'fair' : 'bad') : 'pending'
+            };
+            analysisHistory = [item, ...analysisHistory.slice(0, 19)];
+            localStorage.setItem('kanto_analysis_history', JSON.stringify(analysisHistory));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            if (analysisHistory.length === 0) {
+                list.innerHTML = `
+                    <p style="color: var(--text-secondary); text-align: center; padding: 40px 20px;">
+                        No analyses yet. Start by analyzing a deal!
+                    </p>
+                `;
+                return;
+            }
+
+            list.innerHTML = analysisHistory.map(item => {
+                const date = new Date(item.timestamp);
+                const verdictColors = { good: 'var(--success)', fair: 'var(--warning)', bad: 'var(--danger)', pending: 'var(--text-muted)' };
+                return `
+                    <div class="detected-card">
+                        <div class="detected-card-info">
+                            <div class="detected-card-name">${item.cards_count} cards analyzed</div>
+                            <div class="detected-card-details">
+                                ${date.toLocaleDateString()} ${date.toLocaleTimeString()} • 
+                                Asked: $${item.asking_price.toFixed(2)} • 
+                                Value: $${item.total_value.toFixed(2)}
+                            </div>
+                        </div>
+                        <div class="detected-card-price" style="color: ${verdictColors[item.verdict]}">
+                            ${item.verdict === 'good' ? '✅' : item.verdict === 'fair' ? '👍' : item.verdict === 'bad' ? '⚠️' : '💰'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Quick Lookup
+        async function lookupPrice(e) {
+            e.preventDefault();
+            const name = document.getElementById('lookup-name').value;
+            const btn = document.getElementById('lookup-btn');
+            const resultEl = document.getElementById('lookup-result');
+            const errorEl = document.getElementById('lookup-error');
+
+            btn.disabled = true;
+            btn.textContent = 'Looking up...';
+            resultEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/admin/deal-analyzer/price-lookup`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ product_name: name })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Not found');
+                }
+
+                const data = await response.json();
+                const mainPrice = data.loose_price || data.cib_price || data.new_price || 0;
+
+                resultEl.innerHTML = `
+                    <div class="detected-card" style="flex-direction: column; align-items: stretch;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                            <div>
+                                <div class="detected-card-name">${data.product_name}</div>
+                                <div class="detected-card-details">${data.category}</div>
+                            </div>
+                            <div class="detected-card-price">$${mainPrice.toFixed(2)}</div>
+                        </div>
+                        <div class="price-summary" style="margin: 0;">
+                            <div class="price-box">
+                                <div class="price-box-label">Loose</div>
+                                <div class="price-box-value">${data.loose_price ? '$' + data.loose_price.toFixed(2) : 'N/A'}</div>
+                            </div>
+                            <div class="price-box">
+                                <div class="price-box-label">CIB</div>
+                                <div class="price-box-value">${data.cib_price ? '$' + data.cib_price.toFixed(2) : 'N/A'}</div>
+                            </div>
+                            <div class="price-box">
+                                <div class="price-box-label">Graded</div>
+                                <div class="price-box-value">${data.graded_price ? '$' + data.graded_price.toFixed(2) : 'N/A'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                resultEl.classList.remove('hidden');
+
+            } catch (error) {
+                errorEl.textContent = error.message;
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Look Up Price';
+            }
+        }
+
+        // Loading
+        function showLoading(text, subtext) {
+            document.getElementById('loading-text').textContent = text;
+            document.getElementById('loading-subtext').textContent = subtext;
+            document.getElementById('loading-overlay').classList.add('visible');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.remove('visible');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+{
+  "supplies": [
+    {
+      "name": "Bubble Mailers (#000 - 4x8\")",
+      "quantity_needed": 175,
+      "price": 40,
+      "link": "https://www.amazon.com/dp/B0CPVD6YNZ"
+    },
+    {
+      "name": "Cardboard Stiffeners / Ding Defenders",
+      "quantity_needed": 150,
+      "price": 15,
+      "link": "https://www.amazon.com/dp/B0CY25Z6YS"
+    },
+    {
+      "name": "Top Loaders (35pt)",
+      "quantity_needed": 100,
+      "price": 3,
+      "link": "https://www.amazon.com/dp/B0DGP29B9F"
+    },
+    {
+      "name": "Penny Sleeves",
+      "quantity_needed": 200,
+      "price": 2,
+      "link": "https://www.amazon.com/dp/B0DJL1D13Y"
+    },
+    {
+      "name": "Bubble Wrap Roll",
+      "quantity_needed": 1,
+      "price": 22,
+      "link": "https://www.amazon.com/dp/B09HR51QVW"
+    },
+    {
+      "name": "Painters Tape (Blue)",
+      "quantity_needed": 1,
+      "price": 1,
+      "link": "https://www.amazon.com/dp/B0F1T78TCL"
+    },
+    {
+      "name": "Box: 6\" x 6\" x 6\"",
+      "quantity_needed": 15,
+      "price": 6,
+      "link": "https://www.amazon.com/dp/B0B5W5DY6N"
+    },
+    {
+      "name": "Box: 8x8x4",
+      "quantity_needed": 10,
+      "price": 7,
+      "link": "https://www.amazon.com/dp/B094PP5L73"
+    },
+    {
+      "name": "Box: 15\" x 12\" x 6\"",
+      "quantity_needed": 10,
+      "price": 20,
+      "link": "https://www.amazon.com/dp/B01D3BVIXA"
+    },
+    {
+      "name": "Box: 15\" x 12\" x 10\"",
+      "quantity_needed": 5,
+      "price": 9,
+      "link": "https://www.amazon.com/dp/B01D274H6U"
+    },
+    {
+      "name": "Box: 24\" x 12\" x 12\" (UPC Fit)",
+      "quantity_needed": 5,
+      "price": 12,
+      "link": "https://www.amazon.com/dp/B00BT3MN7U"
+    }
+  ]
+}

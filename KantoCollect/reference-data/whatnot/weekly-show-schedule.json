@@ -1,0 +1,123 @@
+{
+  "weekly_shows": [
+    {
+      "day": "Thursday",
+      "name": "Spin The Wheel",
+      "type": "spin_wheel",
+      "inventory_needed": {
+        "korean_booster_boxes": {
+          "quantity": 6,
+          "notes": "180 Packs total (150 for Spins, 30 for Giveaways)"
+        },
+        "high_tier_prizes": {
+          "quantity": 2,
+          "description": "Grails/UPC",
+          "examples": ["151 UPC", "Moonbreon"]
+        },
+        "mid_tier_prizes": {
+          "quantity": 10,
+          "description": "ETBs/Collection Boxes"
+        },
+        "floor_prizes": {
+          "quantity": 38,
+          "description": "Sleeved packs, pokeballs, blisters"
+        }
+      },
+      "prep_work": {
+        "pre_show_labeling": "300-500 labels",
+        "bubble_wrap_prep": "1 roll"
+      },
+      "shipping_supplies": {
+        "mail_envelopes": 50,
+        "bubble_envelopes": 50,
+        "box_8x8x4": 10,
+        "box_24x12x12": 5,
+        "box_6x6x6": 15,
+        "box_15x12x10": 5,
+        "box_15x12x6": 10
+      }
+    },
+    {
+      "day": "Friday",
+      "name": "Dollar & MSRP Auctions",
+      "type": "auctions",
+      "inventory_needed": {
+        "single_booster_packs": {
+          "quantity": "50-100",
+          "type": "packs"
+        },
+        "chaser_packs": {
+          "quantity": "5-10",
+          "notes": "Older/more expensive packs",
+          "examples": ["Crown Zenith"]
+        },
+        "korean_booster_boxes": {
+          "quantity": 2,
+          "source": "Givvy's"
+        }
+      },
+      "prep_work": {
+        "pack_sleeves": "100 count"
+      },
+      "shipping_supplies": {
+        "envelopes": 50,
+        "bubble_envelopes": 50,
+        "thermal_labels": "100-300",
+        "cardboard_stiffeners": "50-100"
+      }
+    },
+    {
+      "day": "Saturday",
+      "name": "Single Auctions",
+      "type": "singles",
+      "inventory_needed": {
+        "single_cards": {
+          "quantity": "50-100",
+          "tier": "Mid/High"
+        }
+      },
+      "prep_work": {
+        "top_loaders": "100 count",
+        "penny_sleeves": "1 pack (100)",
+        "team_bags": "1 pack (100)"
+      },
+      "shipping_supplies": {
+        "sleeve_guards": "50-100",
+        "mailer_000": "50-75",
+        "painters_tape": "1 roll"
+      }
+    }
+  ],
+  "master_supplies": {
+    "weekly_totals": {
+      "inventory": {
+        "korean_booster_boxes": {"quantity": 8, "cost": 200},
+        "loose_booster_packs": {"quantity": 90, "cost": 500},
+        "chaser_packs": {"quantity": 10, "cost": 130},
+        "high_end_singles_slabs": {"quantity": 100, "cost": 100},
+        "high_tier_prizes_upc": {"quantity": 2, "cost": 260},
+        "mid_tier_prizes_etb": {"quantity": 10, "cost": 550},
+        "floor_prizes": {"quantity": 38, "cost": 500}
+      },
+      "supplies": {
+        "bubble_mailers_000": {"quantity": 175, "cost": 40},
+        "standard_envelopes": {"quantity": 100, "cost": 5},
+        "thermal_labels": {"quantity": 500, "cost": 15},
+        "cardboard_stiffeners": {"quantity": 150, "cost": 15},
+        "top_loaders": {"quantity": 100, "cost": 3},
+        "penny_sleeves": {"quantity": 200, "cost": 2},
+        "team_bags": {"quantity": 200, "cost": 5},
+        "bubble_wrap_roll": {"quantity": 1, "cost": 22},
+        "painters_tape": {"quantity": 1, "cost": 1}
+      },
+      "boxes": {
+        "box_6x6x6": {"quantity": 15, "cost": 6},
+        "box_8x8x4": {"quantity": 10, "cost": 7},
+        "box_15x12x6": {"quantity": 10, "cost": 20},
+        "box_15x12x10": {"quantity": 5, "cost": 9},
+        "box_24x12x12": {"quantity": 5, "cost": 12}
+      },
+      "total_weekly_cost": 2402
+    }
+  }
+}

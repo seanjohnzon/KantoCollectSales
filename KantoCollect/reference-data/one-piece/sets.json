@@ -1,0 +1,141 @@
+{
+  "game": "One Piece TCG",
+  "publisher": "Bandai",
+  "sets": [
+    {
+      "code": "OP-01",
+      "name": "Romance Dawn",
+      "release_date": "2022-12-02",
+      "card_count": 121,
+      "region": "English"
+    },
+    {
+      "code": "OP-02",
+      "name": "Paramount War",
+      "release_date": "2023-03-10",
+      "card_count": 121,
+      "region": "English"
+    },
+    {
+      "code": "OP-03",
+      "name": "Pillars of Strength",
+      "release_date": "2023-06-30",
+      "card_count": 121,
+      "region": "English"
+    },
+    {
+      "code": "OP-04",
+      "name": "Kingdoms of Intrigue",
+      "release_date": "2023-09-22",
+      "card_count": 121,
+      "region": "English"
+    },
+    {
+      "code": "OP-05",
+      "name": "Awakening of the New Era",
+      "release_date": "2023-12-08",
+      "card_count": 121,
+      "region": "English"
+    },
+    {
+      "code": "OP-06",
+      "name": "Wings of the Captain",
+      "release_date": "2024-03-15",
+      "card_count": 121,
+      "region": "English"
+    },
+    {
+      "code": "OP-07",
+      "name": "500 Years in the Future",
+      "release_date": "2024-06-28",
+      "card_count": 121,
+      "region": "English"
+    },
+    {
+      "code": "OP-08",
+      "name": "Two Legends",
+      "release_date": "2024-09-13",
+      "card_count": 121,
+      "region": "English"
+    },
+    {
+      "code": "ST-01",
+      "name": "Straw Hat Crew",
+      "release_date": "2022-12-02",
+      "card_count": 17,
+      "region": "English",
+      "type": "Starter Deck"
+    },
+    {
+      "code": "ST-02",
+      "name": "Worst Generation",
+      "release_date": "2022-12-02",
+      "card_count": 17,
+      "region": "English",
+      "type": "Starter Deck"
+    },
+    {
+      "code": "ST-03",
+      "name": "The Seven Warlords of the Sea",
+      "release_date": "2022-12-02",
+      "card_count": 17,
+      "region": "English",
+      "type": "Starter Deck"
+    },
+    {
+      "code": "ST-04",
+      "name": "Animal Kingdom Pirates",
+      "release_date": "2022-12-02",
+      "card_count": 17,
+      "region": "English",
+      "type": "Starter Deck"
+    }
+  ],
+  "variants": [
+    {
+      "code": "L",
+      "name": "Leader",
+      "description": "Leader cards for each deck"
+    },
+    {
+      "code": "C",
+      "name": "Common",
+      "description": "Common rarity"
+    },
+    {
+      "code": "UC",
+      "name": "Uncommon", 
+      "description": "Uncommon rarity"
+    },
+    {
+      "code": "R",
+      "name": "Rare",
+      "description": "Rare rarity"
+    },
+    {
+      "code": "SR",
+      "name": "Super Rare",
+      "description": "Super Rare rarity"
+    },
+    {
+      "code": "SEC",
+      "name": "Secret Rare",
+      "description": "Secret Rare rarity"
+    },
+    {
+      "code": "SP",
+      "name": "SP Card / Parallel",
+      "description": "Special parallel texture finish, premium version"
+    },
+    {
+      "code": "AA",
+      "name": "Alt-Art / Alternate Art",
+      "description": "Alternative artwork version"
+    },
+    {
+      "code": "MANGA",
+      "name": "Manga Art",
+      "description": "Manga-style artwork special edition"
+    }
+  ]
+}
