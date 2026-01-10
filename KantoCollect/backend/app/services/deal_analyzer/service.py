@@ -400,9 +400,9 @@ CRITICAL: ONLY OUTPUT VALID JSON. NO TEXT BEFORE OR AFTER.
         print(f"Expected count: {expected_count}")
         print(f"Context: {context}")
         
-        # Call Claude - using Sonnet for better vision/OCR than Haiku
+        # Call Claude - using Haiku (fastest, cheapest)
         response = client.messages.create(
-            model="claude-3-sonnet-20240229",
+            model="claude-3-haiku-20240307",
             max_tokens=4096,
             system=self.CARD_DETECTION_PROMPT,
             messages=[{"role": "user", "content": content}],
