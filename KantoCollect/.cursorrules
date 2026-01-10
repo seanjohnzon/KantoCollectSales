@@ -1,0 +1,31 @@
+# MANDATORY TESTING RULES - DO NOT SKIP
+
+## CRITICAL: TEST AFTER EVERY CHANGE
+After ANY code modification, the AI MUST:
+1. **ASK THE USER**: "Should I test this change now? (yes/no)"
+2. **WAIT FOR RESPONSE** before proceeding
+3. **IF YES**: Run the appropriate test immediately
+4. **IF TEST FAILS**: Revert the change with `git checkout HEAD -- <file>` before trying again
+
+## Testing Methods (choose appropriate one):
+- **Backend API**: `curl` the endpoint directly
+- **Frontend UI**: Use browser tools to navigate and take screenshot
+- **Python code**: Run `pytest` or direct Python execution
+- **Database**: Query with SQLite/psql
+
+## NEVER:
+- Say "this should work" without testing
+- Assume a fix works
+- Make multiple changes before testing
+- Skip testing because "it's a simple change"
+
+## Git Workflow:
+- Commit after EACH working change
+- If something breaks, revert immediately: `git checkout HEAD~1 -- .`
+- Always have a working commit to fall back to
+
+## When User Reports Error:
+1. First check server logs
+2. Then check the actual code that was changed
+3. Test the specific failure case
+4. Only then propose a fix
