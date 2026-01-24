@@ -131,8 +131,35 @@
     <div id="master-catalog-tab" class="tab-content">
       <div class="card">
         <h2>📋 Master Catalog - Assign COGS</h2>
-        <p class="muted">Set COGS for your products. Keywords will auto-match transactions.</p>
-        <div id="catalogGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-top:16px;"></div>
+        <p class="muted" style="margin-bottom:16px;">Set default COGS for each product. These values will be used when creating COGS mapping rules.</p>
+
+        <!-- Save Button -->
+        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+          <div class="muted" style="font-size:12px;">Enter COGS values and click Save All to update the catalog</div>
+          <button onclick="saveAllCatalogCOGS()" id="saveCatalogCOGSBtn" style="display:none;">💾 Save All COGS</button>
+        </div>
+
+        <!-- Products Table -->
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#1f2937; text-align:left; border-bottom:2px solid #22c55e;">
+                <th style="padding:12px 8px; font-weight:600; width:80px;">Image</th>
+                <th style="padding:12px 8px; font-weight:600;">Product Name</th>
+                <th style="padding:12px 8px; font-weight:600;">Category</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:center;">Sales</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Revenue</th>
+                <th style="padding:12px 8px; font-weight:600;">Keywords</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">COGS ($)</th>
+              </tr>
+            </thead>
+            <tbody id="catalogTableBody">
+              <tr>
+                <td colspan="7" style="padding:20px; text-align:center;" class="muted">Loading master catalog...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1290,18 +1317,18 @@
       ).join('');
     }
 
-    // Master Catalog (with images and COGS assignment)
+    // Master Catalog (table format with editable COGS)
+    let catalogProducts = [];
+
     async function loadMasterCatalog() {
-      const grid = document.getElementById("catalogGrid");
-      grid.innerHTML = '<div class="muted">Loading products...</div>';
+      const tbody = document.getElementById("catalogTableBody");
 
       try {
         const res = await fetch(`${apiBase}/product-catalog`, { headers: authHeaders() });
 
         if (!res.ok) {
           const error = await res.json();
-          grid.innerHTML = `<div class="danger">❌ Error loading products: ${error.detail || res.statusText}</div>
-                           <div class="muted">Make sure you have saved your admin token above.</div>`;
+          tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center;" class="danger">❌ Error loading products: ${error.detail || res.statusText}</td></tr>`;
           console.error('Product catalog error:', error);
           return;
         }
@@ -1310,60 +1337,120 @@
         console.log('Product catalog loaded:', data);
 
         if (!data.products || data.products.length === 0) {
-          grid.innerHTML = '<div class="warning">⚠ No products found</div>';
+          tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center;" class="warning">⚠ No products found</td></tr>';
           return;
         }
 
-        grid.innerHTML = data.products.map(p => `
-          <div class="card" style="padding:12px;">
-            <img src="${p.imageUrl}"
-                 style="width:100%; border-radius:8px; margin-bottom:8px;"
-                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22%3E%3Crect fill=%22%23333%22 width=%22300%22 height=%22300%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E%3C/svg%3E'; console.error('Failed to load: ${p.imageUrl}');"
-                 loading="lazy" />
-            <div style="font-size:14px; font-weight:600; margin-bottom:4px;">${p.name}</div>
-            <div class="muted" style="font-size:12px; margin-bottom:8px;">${p.category} | ${p.sales} sales | $${p.revenue} revenue</div>
-            <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Keywords: ${p.keywords.join(', ')}</div>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <input type="number" id="cogs-${p.id}" placeholder="COGS" step="0.01" min="0" style="flex:1; padding:6px;">
-              <button onclick="saveCOGS(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${JSON.stringify(p.keywords)})" style="padding:6px 12px; font-size:12px;">Save</button>
-            </div>
-          </div>
+        catalogProducts = data.products;
+
+        // Show save button if admin
+        if (adminEnabled) {
+          document.getElementById('saveCatalogCOGSBtn').style.display = 'inline-block';
+        }
+
+        tbody.innerHTML = data.products.map((p, index) => `
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:12px 8px;">
+              <img src="${p.imageUrl}"
+                   style="width:60px; height:60px; border-radius:6px; object-fit:cover;"
+                   onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22%3E%3Crect fill=%22%23333%22 width=%2260%22 height=%2260%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2210%22%3E?%3C/text%3E%3C/svg%3E';"
+                   loading="lazy" />
+            </td>
+            <td style="padding:12px 8px;">
+              <div style="font-weight:500;">${p.name}</div>
+            </td>
+            <td style="padding:12px 8px;">
+              <div class="muted" style="font-size:12px;">${p.category}</div>
+            </td>
+            <td style="padding:12px 8px; text-align:center;">
+              <div class="muted">${p.sales}</div>
+            </td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600;">
+              $${p.revenue}
+            </td>
+            <td style="padding:12px 8px;">
+              <div style="font-size:11px; color:#64748b;">${p.keywords.join(', ')}</div>
+            </td>
+            <td style="padding:12px 8px; text-align:right;">
+              <input type="number"
+                     step="0.01"
+                     min="0"
+                     value=""
+                     placeholder="0.00"
+                     data-product-id="${p.id}"
+                     data-product-index="${index}"
+                     data-product-name="${p.name.replace(/"/g, '&quot;')}"
+                     data-keywords='${JSON.stringify(p.keywords)}'
+                     style="width:90px; text-align:right; padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
+            </td>
+          </tr>
         `).join('');
 
-        // Log first few image URLs for debugging
-        console.log('Sample image URLs:', data.products.slice(0, 3).map(p => p.imageUrl));
       } catch (error) {
-        grid.innerHTML = `<div class="danger">❌ Error: ${error.message}</div>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center;" class="danger">❌ Error: ${error.message}</td></tr>`;
         console.error('Failed to load catalog:', error);
       }
     }
 
-    async function saveCOGS(productId, productName, keywords) {
-      const cogsInput = document.getElementById(`cogs-${productId}`);
-      const cogs = parseFloat(cogsInput.value);
+    async function saveAllCatalogCOGS() {
+      const saveBtn = document.getElementById('saveCatalogCOGSBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = '💾 Saving...';
 
-      if (!cogs || cogs <= 0) {
-        alert('Please enter a valid COGS amount');
-        return;
-      }
+      try {
+        const inputs = document.querySelectorAll('input[data-product-id]');
+        const updates = [];
 
-      const res = await fetch(`${apiBase}/product-catalog/save-cogs`, {
-        method: 'POST',
-        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_id: productId,
-          cogs: cogs,
-          keywords: keywords,
-          product_name: productName
-        })
-      });
+        for (const input of inputs) {
+          const cogs = parseFloat(input.value);
+          if (cogs && cogs > 0) {
+            const productId = input.getAttribute('data-product-id');
+            const productName = input.getAttribute('data-product-name');
+            const keywords = JSON.parse(input.getAttribute('data-keywords'));
 
-      const result = await res.json();
-      if (result.success) {
-        alert(`✓ COGS rule created for ${productName}`);
-        cogsInput.style.background = '#22c55e33';
-      } else {
-        alert('Error saving COGS');
+            updates.push({
+              product_id: productId,
+              product_name: productName,
+              keywords: keywords,
+              cogs: cogs
+            });
+          }
+        }
+
+        if (updates.length === 0) {
+          alert('No COGS values entered. Enter at least one COGS value to save.');
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 Save All COGS';
+          return;
+        }
+
+        // Save each COGS value
+        let successCount = 0;
+        for (const update of updates) {
+          const res = await fetch(`${apiBase}/product-catalog/save-cogs`, {
+            method: 'POST',
+            headers: {
+              ...authHeaders(),
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(update)
+          });
+
+          if (res.ok) {
+            successCount++;
+          }
+        }
+
+        alert(`✅ Successfully saved ${successCount} of ${updates.length} COGS values`);
+
+        // Reload catalog
+        await loadMasterCatalog();
+
+      } catch (error) {
+        alert(`Error saving COGS: ${error.message}`);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Save All COGS';
       }
     }
 
