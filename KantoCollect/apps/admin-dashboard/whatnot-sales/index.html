@@ -344,6 +344,9 @@
         </div>
 
         <!-- Orders Table -->
+        <div style="margin-bottom:16px; display:flex; justify-content:flex-end; align-items:center;">
+          <button onclick="saveAllMarketplaceCOGS()" id="saveMarketplaceCOGSBtn" style="display:none;">💾 Save All COGS Changes</button>
+        </div>
         <div style="overflow-x:auto;">
           <table style="width:100%; border-collapse:collapse; font-size:13px;">
             <thead>
@@ -1459,6 +1462,7 @@
     }
 
     let expandedMarketplaceRows = new Set();
+    let currentMarketplaceOrders = [];
 
     async function loadMarketplace() {
       const tbody = document.getElementById("marketplaceTableBody");
@@ -1467,10 +1471,17 @@
       try {
         const res = await fetch(`${apiBase}/transactions?sale_type=marketplace&limit=500`, { headers: authHeaders() });
         const orders = await res.json();
+        currentMarketplaceOrders = orders;
 
         if (orders.length === 0) {
           tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="muted">No marketplace orders yet. Import your first Excel file above!</td></tr>';
+          document.getElementById('saveMarketplaceCOGSBtn').style.display = 'none';
           return;
+        }
+
+        // Show save button if admin
+        if (adminEnabled) {
+          document.getElementById('saveMarketplaceCOGSBtn').style.display = 'inline-block';
         }
 
         // Group orders by product name
@@ -1492,7 +1503,9 @@
 
         // Render grouped rows
         const rows = [];
-        Object.keys(grouped).sort().forEach((productName, index) => {
+        let orderIndex = 0; // Global index for tracking individual orders
+
+        Object.keys(grouped).sort().forEach((productName, groupIndex) => {
           const items = grouped[productName];
           const count = items.length;
 
@@ -1544,6 +1557,9 @@
           // Expanded detail rows (if expanded and count > 1)
           if (isExpanded && count > 1) {
             items.forEach((order, i) => {
+              const currentOrderIndex = orderIndex;
+              orderIndex++;
+
               const orderRevenue = parseFloat(order.total_revenue || order.gross_sale_price || 0);
               const orderEarnings = parseFloat(order.net_earnings || 0);
               const orderCOGS = parseFloat(order.cogs || 0);
@@ -1564,12 +1580,23 @@
                   <td style="padding:8px; text-align:right; font-size:12px;">$${orderRevenue.toFixed(2)}</td>
                   <td style="padding:8px; text-align:right; font-size:12px;">-</td>
                   <td style="padding:8px; text-align:right; font-size:12px; color:#22c55e;">$${orderEarnings.toFixed(2)}</td>
-                  <td style="padding:8px; text-align:right; font-size:12px;" class="muted">${orderCOGS > 0 ? `$${orderCOGS.toFixed(2)}` : '-'}</td>
-                  <td style="padding:8px; text-align:right; font-size:12px; color:${orderProfitColor};">$${orderProfit.toFixed(2)}</td>
-                  <td style="padding:8px; text-align:right; font-size:12px; color:${orderROIColor};">${orderROI}${orderROI !== 'N/A' ? '%' : ''}</td>
+                  <td style="padding:8px; text-align:right;">
+                    <input type="number"
+                           step="0.01"
+                           value="${orderCOGS.toFixed(2)}"
+                           data-transaction-id="${order.id}"
+                           data-marketplace-index="${currentOrderIndex}"
+                           onchange="updateMarketplaceCalc(${currentOrderIndex})"
+                           style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;" />
+                  </td>
+                  <td id="marketplace-profit-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderProfitColor};">$${orderProfit.toFixed(2)}</td>
+                  <td id="marketplace-roi-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderROIColor};">${orderROI}${orderROI !== 'N/A' ? '%' : ''}</td>
                 </tr>
               `);
             });
+          } else {
+            // Still increment orderIndex for items in collapsed groups
+            orderIndex += items.length;
           }
         });
 
@@ -1611,6 +1638,83 @@
         expandedMarketplaceRows.add(productName);
       }
       loadMarketplace();
+    }
+
+    function updateMarketplaceCalc(index) {
+      const order = currentMarketplaceOrders[index];
+      const cogsInput = document.querySelector(`input[data-marketplace-index="${index}"]`);
+      const newCOGS = parseFloat(cogsInput.value) || 0;
+
+      const earnings = parseFloat(order.net_earnings || 0);
+      const profit = earnings - newCOGS;
+      const roi = newCOGS > 0 ? ((profit / newCOGS) * 100).toFixed(1) : 'N/A';
+
+      const profitColor = profit > 0 ? '#22c55e' : profit < 0 ? '#ef4444' : '#94a3b8';
+      const roiColor = roi !== 'N/A' ? (parseFloat(roi) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
+
+      document.getElementById(`marketplace-profit-${index}`).textContent = `$${profit.toFixed(2)}`;
+      document.getElementById(`marketplace-profit-${index}`).style.color = profitColor;
+      document.getElementById(`marketplace-roi-${index}`).textContent = `${roi}${roi !== 'N/A' ? '%' : ''}`;
+      document.getElementById(`marketplace-roi-${index}`).style.color = roiColor;
+    }
+
+    async function saveAllMarketplaceCOGS() {
+      const saveBtn = document.getElementById('saveMarketplaceCOGSBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = '💾 Saving...';
+
+      try {
+        const updates = [];
+        const inputs = document.querySelectorAll('input[data-transaction-id]');
+
+        for (const input of inputs) {
+          const transactionId = parseInt(input.getAttribute('data-transaction-id'));
+          const newCOGS = parseFloat(input.value) || 0;
+          const index = parseInt(input.getAttribute('data-marketplace-index'));
+          const order = currentMarketplaceOrders[index];
+          const oldCOGS = parseFloat(order.cogs || 0);
+
+          // Only update if changed
+          if (Math.abs(newCOGS - oldCOGS) > 0.001) {
+            updates.push({ id: transactionId, cogs: newCOGS });
+          }
+        }
+
+        if (updates.length === 0) {
+          alert('No changes to save');
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 Save All COGS Changes';
+          return;
+        }
+
+        // Update each transaction
+        let successCount = 0;
+        for (const update of updates) {
+          const res = await fetch(`${apiBase}/transactions/${update.id}`, {
+            method: 'PUT',
+            headers: {
+              ...authHeaders(),
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ cogs: update.cogs })
+          });
+
+          if (res.ok) {
+            successCount++;
+          }
+        }
+
+        alert(`✅ Updated ${successCount} of ${updates.length} marketplace orders`);
+
+        // Reload marketplace to refresh totals
+        await loadMarketplace();
+
+      } catch (error) {
+        alert(`Error saving COGS: ${error.message}`);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Save All COGS Changes';
+      }
     }
 
     // Initialize
