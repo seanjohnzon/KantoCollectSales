@@ -273,6 +273,7 @@ def import_excel_show(
     errors = []
     warnings = []
     imported_count = 0
+    skipped_count = 0
     cogs_assigned_count = 0
     cogs_missing_count = 0
     products_created = set()
@@ -283,19 +284,39 @@ def import_excel_show(
         row_num = idx + 2  # Excel row number (header is 1)
 
         try:
-            # Skip empty rows
+            # Skip empty rows - check critical fields first
             if pd.isna(row.get('Item Name')) or str(row.get('Item Name')).strip() == '':
+                skipped_count += 1
                 continue
 
-            # Parse required fields
+            if pd.isna(row.get('Date')):
+                skipped_count += 1
+                warnings.append(f"Row {row_num}: Skipped - no date")
+                continue
+
+            if pd.isna(row.get('Buyer')) or str(row.get('Buyer')).strip() == '':
+                skipped_count += 1
+                warnings.append(f"Row {row_num}: Skipped - no buyer")
+                continue
+
+            # Parse required fields with safe handling
             transaction_date = parse_date(row['Date'])
             item_name = str(row['Item Name']).strip()
-            quantity = int(row.get('Quantity', 1))
-            buyer_username = str(row['Buyer']).strip()
-            gross_sale_price = parse_decimal(row['Gross Sale Price'])
-            net_earnings = parse_decimal(row['Net Earnings'])
 
-            # Parse optional fields
+            # Quantity - default to 1 if empty
+            if pd.isna(row.get('Quantity')):
+                quantity = 1
+            else:
+                try:
+                    quantity = int(row['Quantity'])
+                except:
+                    quantity = 1
+
+            buyer_username = str(row['Buyer']).strip()
+            gross_sale_price = parse_decimal(row.get('Gross Sale Price', 0))
+            net_earnings = parse_decimal(row.get('Net Earnings', 0))
+
+            # Parse optional fields - handle all as nullable
             sku = str(row.get('SKU', '')).strip() if not pd.isna(row.get('SKU')) else None
             discount = parse_decimal(row.get('Discount', 0))
             whatnot_commission = parse_decimal(row.get('WhatNot Commission', 0))
@@ -573,23 +594,40 @@ def import_marketplace_excel(
             # Parse transaction date
             trans_date = parse_date(row.iloc[0])
 
-            # Extract fields
-            product_name = str(row.iloc[1]) if not pd.isna(row.iloc[1]) else "Unknown Product"
-            quantity = int(row.iloc[2]) if not pd.isna(row.iloc[2]) else 1
-            buyer_username = str(row.iloc[3]) if not pd.isna(row.iloc[3]) else "Unknown"
-            total_revenue = Decimal(str(row.iloc[4])) if not pd.isna(row.iloc[4]) else Decimal("0")
-            payment_status = str(row.iloc[5]) if not pd.isna(row.iloc[5]) else "Unknown"
-            discount = Decimal(str(row.iloc[6])) if not pd.isna(row.iloc[6]) else Decimal("0")
-            whatnot_commission = Decimal(str(row.iloc[7])) if not pd.isna(row.iloc[7]) else Decimal("0")
-            whatnot_fee = Decimal(str(row.iloc[8])) if not pd.isna(row.iloc[8]) else Decimal("0")
-            payment_processing_fee = Decimal(str(row.iloc[9])) if not pd.isna(row.iloc[9]) else Decimal("0")
-            net_earnings = Decimal(str(row.iloc[10])) if not pd.isna(row.iloc[10]) else Decimal("0")
+            # Extract fields with robust null handling
+            product_name = str(row.iloc[1]).strip() if not pd.isna(row.iloc[1]) else None
+            if not product_name or product_name == 'nan':
+                skipped_count += 1
+                warnings.append(f"Row {idx + 2}: Skipped - no product name")
+                continue
 
-            # COGS and profit (may be empty)
-            cogs_value = Decimal(str(row.iloc[11])) if not pd.isna(row.iloc[11]) else None
-            net_profit = Decimal(str(row.iloc[12])) if not pd.isna(row.iloc[12]) else None
-            roi = Decimal(str(row.iloc[13])) if not pd.isna(row.iloc[13]) else None
-            notes = str(row.iloc[14]) if not pd.isna(row.iloc[14]) else None
+            # Buyer
+            buyer_username = str(row.iloc[3]).strip() if not pd.isna(row.iloc[3]) else None
+            if not buyer_username or buyer_username == 'nan':
+                skipped_count += 1
+                warnings.append(f"Row {idx + 2}: Skipped - no buyer")
+                continue
+
+            # Numeric fields with safe parsing
+            quantity = int(row.iloc[2]) if not pd.isna(row.iloc[2]) else 1
+            total_revenue = parse_decimal(row.iloc[4]) if not pd.isna(row.iloc[4]) else Decimal("0")
+            payment_status = str(row.iloc[5]).strip() if not pd.isna(row.iloc[5]) else "Unknown"
+            discount = parse_decimal(row.iloc[6]) if not pd.isna(row.iloc[6]) else Decimal("0")
+            whatnot_commission = parse_decimal(row.iloc[7]) if not pd.isna(row.iloc[7]) else Decimal("0")
+            whatnot_fee = parse_decimal(row.iloc[8]) if not pd.isna(row.iloc[8]) else Decimal("0")
+            payment_processing_fee = parse_decimal(row.iloc[9]) if not pd.isna(row.iloc[9]) else Decimal("0")
+            net_earnings = parse_decimal(row.iloc[10]) if not pd.isna(row.iloc[10]) else Decimal("0")
+
+            # COGS and profit (may be empty) - use None for truly empty values
+            cogs_value = parse_decimal(row.iloc[11]) if not pd.isna(row.iloc[11]) else None
+            if cogs_value == Decimal("0"):
+                cogs_value = None  # Treat 0 as no COGS for marketplace
+
+            net_profit = parse_decimal(row.iloc[12]) if not pd.isna(row.iloc[12]) else None
+            roi = parse_decimal(row.iloc[13]) if not pd.isna(row.iloc[13]) else None
+            notes = str(row.iloc[14]).strip() if not pd.isna(row.iloc[14]) else None
+            if notes == 'nan':
+                notes = None
 
             # Get or create product
             product = get_or_create_product(session, product_name)
