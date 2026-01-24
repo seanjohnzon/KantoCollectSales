@@ -310,11 +310,11 @@
     <div id="marketplace-tab" class="tab-content">
       <div class="card">
         <h2>🛒 Marketplace Orders</h2>
-        <p class="muted">Import and manage WhatNot marketplace orders (non-stream sales)</p>
+        <p class="muted" style="margin-bottom:16px;">Import and manage WhatNot marketplace orders (non-stream sales)</p>
 
         <!-- Import Section -->
-        <div style="margin-top:16px; padding:16px; background:#111827; border-radius:8px;">
-          <h3 style="margin-bottom:12px;">Import Marketplace Excel</h3>
+        <div style="padding:16px; background:#0f172a; border-radius:8px; border:1px solid #1f2937; margin-bottom:24px;">
+          <h3 style="margin:0 0 12px 0; font-size:16px;">📤 Import Marketplace Excel</h3>
           <div class="row">
             <input type="file" id="marketplaceFile" accept=".xlsx,.xls" style="flex:1;" />
             <button onclick="uploadMarketplace()">Upload & Import</button>
@@ -323,10 +323,51 @@
           <div id="marketplaceImportResults" style="margin-top:12px;"></div>
         </div>
 
-        <!-- Orders List -->
-        <div style="margin-top:24px;">
-          <h3 style="margin-bottom:12px;">Recent Orders</h3>
-          <div id="marketplaceOrders" class="grid"></div>
+        <!-- Summary Stats -->
+        <div class="stat-grid" style="margin-bottom:24px;">
+          <div class="stat-card">
+            <div class="stat-value" id="marketplaceTotalOrders">0</div>
+            <div class="stat-label">Total Orders</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="marketplaceRevenue">$0</div>
+            <div class="stat-label">Total Revenue</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="marketplaceEarnings">$0</div>
+            <div class="stat-label">Total Earnings</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="marketplaceProfit">$0</div>
+            <div class="stat-label">Net Profit</div>
+          </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#1f2937; text-align:left; border-bottom:2px solid #22c55e;">
+                <th style="padding:12px 8px; font-weight:600; width:40px;"></th>
+                <th style="padding:12px 8px; font-weight:600;">Product Name</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:center;">Qty Sold</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Avg Price</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Revenue</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Earnings</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Avg COGS</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Profit</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Avg ROI%</th>
+              </tr>
+            </thead>
+            <tbody id="marketplaceTableBody">
+              <tr>
+                <td colspan="9" style="padding:20px; text-align:center;" class="muted">Loading marketplace orders...</td>
+              </tr>
+            </tbody>
+            <tfoot id="marketplaceTableFooter" style="background:#1f2937; border-top:2px solid #22c55e; font-weight:600;">
+              <!-- Totals row will be added here -->
+            </tfoot>
+          </table>
         </div>
       </div>
     </div>
@@ -1417,57 +1458,159 @@
       }
     }
 
+    let expandedMarketplaceRows = new Set();
+
     async function loadMarketplace() {
-      const container = document.getElementById("marketplaceOrders");
-      container.innerHTML = '<div class="muted">Loading orders...</div>';
+      const tbody = document.getElementById("marketplaceTableBody");
+      const tfoot = document.getElementById("marketplaceTableFooter");
 
       try {
-        const res = await fetch(`${apiBase}/transactions?sale_type=marketplace&limit=50`, { headers: authHeaders() });
+        const res = await fetch(`${apiBase}/transactions?sale_type=marketplace&limit=500`, { headers: authHeaders() });
         const orders = await res.json();
 
         if (orders.length === 0) {
-          container.innerHTML = '<div class="muted">No marketplace orders yet. Import your first Excel file above!</div>';
+          tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="muted">No marketplace orders yet. Import your first Excel file above!</td></tr>';
           return;
         }
 
-        container.innerHTML = orders.map(o => `
-          <div class="card" style="padding:12px;">
-            <div style="font-size:14px; font-weight:600; margin-bottom:4px;">${o.item_name}</div>
-            <div class="muted" style="font-size:12px; margin-bottom:8px;">
-              ${new Date(o.transaction_date).toLocaleDateString()} | ${o.buyer_username}
-            </div>
-            <div class="row" style="justify-content:space-between; margin-bottom:4px;">
-              <span class="muted">Revenue:</span>
-              <span style="color:#22c55e; font-weight:600;">$${o.total_revenue || o.gross_sale_price}</span>
-            </div>
-            <div class="row" style="justify-content:space-between; margin-bottom:4px;">
-              <span class="muted">Net Earnings:</span>
-              <span>$${o.net_earnings}</span>
-            </div>
-            ${o.cogs ? `
-              <div class="row" style="justify-content:space-between; margin-bottom:4px;">
-                <span class="muted">COGS:</span>
-                <span>$${o.cogs}</span>
-              </div>
-              <div class="row" style="justify-content:space-between;">
-                <span class="muted">Profit:</span>
-                <span style="color:#22c55e; font-weight:600;">$${o.net_profit} (${o.roi_percent}%)</span>
-              </div>
-            ` : `
-              <div style="margin-top:8px; padding:6px; background:#1f2937; border-radius:4px; text-align:center;">
-                <span class="warning">⚠ No COGS assigned</span>
-              </div>
-            `}
-            ${o.payment_status ? `
-              <div style="margin-top:8px;">
-                <span class="muted" style="font-size:11px;">Status: ${o.payment_status}</span>
-              </div>
-            ` : ''}
-          </div>
-        `).join('');
+        // Group orders by product name
+        const grouped = {};
+        orders.forEach(order => {
+          const key = order.item_name;
+          if (!grouped[key]) {
+            grouped[key] = [];
+          }
+          grouped[key].push(order);
+        });
+
+        // Calculate totals
+        let totalOrders = orders.length;
+        let totalRevenue = 0;
+        let totalEarnings = 0;
+        let totalCOGS = 0;
+        let totalProfit = 0;
+
+        // Render grouped rows
+        const rows = [];
+        Object.keys(grouped).sort().forEach((productName, index) => {
+          const items = grouped[productName];
+          const count = items.length;
+
+          // Calculate aggregates for this product
+          const revenue = items.reduce((sum, o) => sum + parseFloat(o.total_revenue || o.gross_sale_price || 0), 0);
+          const earnings = items.reduce((sum, o) => sum + parseFloat(o.net_earnings || 0), 0);
+          const cogs = items.reduce((sum, o) => sum + parseFloat(o.cogs || 0), 0);
+          const profit = earnings - cogs;
+          const avgPrice = revenue / count;
+          const avgCOGS = cogs / count;
+          const avgROI = cogs > 0 ? ((profit / cogs) * 100).toFixed(1) : 'N/A';
+
+          // Add to totals
+          totalRevenue += revenue;
+          totalEarnings += earnings;
+          totalCOGS += cogs;
+          totalProfit += profit;
+
+          // Determine colors
+          const profitColor = profit > 0 ? '#22c55e' : profit < 0 ? '#ef4444' : '#94a3b8';
+          const roiColor = avgROI !== 'N/A' ? (parseFloat(avgROI) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
+
+          const isExpanded = expandedMarketplaceRows.has(productName);
+          const expandIcon = isExpanded ? '▼' : '▶';
+
+          // Main row
+          rows.push(`
+            <tr style="border-bottom:1px solid #1f2937; cursor:${count > 1 ? 'pointer' : 'default'}; transition:background 0.2s;"
+                ${count > 1 ? `onclick="toggleMarketplaceExpand('${productName.replace(/'/g, "\\'")}', this)"` : ''}
+                onmouseover="this.style.background='${count > 1 ? '#111827' : 'transparent'}'"
+                onmouseout="this.style.background='transparent'">
+              <td style="padding:12px 8px; text-align:center; color:#94a3b8;">
+                ${count > 1 ? expandIcon : ''}
+              </td>
+              <td style="padding:12px 8px;">
+                <div style="font-weight:500;">${productName}</div>
+                ${count > 1 ? `<div class="muted" style="font-size:11px; margin-top:2px;">${count} orders</div>` : ''}
+              </td>
+              <td style="padding:12px 8px; text-align:center; font-weight:600;">${count}</td>
+              <td style="padding:12px 8px; text-align:right;">$${avgPrice.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600;">$${revenue.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${earnings.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right;" class="muted">${cogs > 0 ? `$${avgCOGS.toFixed(2)}` : '-'}</td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600; color:${profitColor};">$${profit.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600; color:${roiColor};">${avgROI}${avgROI !== 'N/A' ? '%' : ''}</td>
+            </tr>
+          `);
+
+          // Expanded detail rows (if expanded and count > 1)
+          if (isExpanded && count > 1) {
+            items.forEach((order, i) => {
+              const orderRevenue = parseFloat(order.total_revenue || order.gross_sale_price || 0);
+              const orderEarnings = parseFloat(order.net_earnings || 0);
+              const orderCOGS = parseFloat(order.cogs || 0);
+              const orderProfit = orderEarnings - orderCOGS;
+              const orderROI = orderCOGS > 0 ? ((orderProfit / orderCOGS) * 100).toFixed(1) : 'N/A';
+              const orderProfitColor = orderProfit > 0 ? '#22c55e' : orderProfit < 0 ? '#ef4444' : '#94a3b8';
+              const orderROIColor = orderROI !== 'N/A' ? (parseFloat(orderROI) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
+
+              const date = new Date(order.transaction_date);
+              const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+              rows.push(`
+                <tr class="marketplace-detail-row" style="background:#0f172a; border-bottom:1px solid #1f2937;">
+                  <td style="padding:8px 8px 8px 32px;"></td>
+                  <td style="padding:8px;" colspan="2">
+                    <div style="font-size:12px;" class="muted">${dateStr} • @${order.buyer_username || 'Unknown'}</div>
+                  </td>
+                  <td style="padding:8px; text-align:right; font-size:12px;">$${orderRevenue.toFixed(2)}</td>
+                  <td style="padding:8px; text-align:right; font-size:12px;">-</td>
+                  <td style="padding:8px; text-align:right; font-size:12px; color:#22c55e;">$${orderEarnings.toFixed(2)}</td>
+                  <td style="padding:8px; text-align:right; font-size:12px;" class="muted">${orderCOGS > 0 ? `$${orderCOGS.toFixed(2)}` : '-'}</td>
+                  <td style="padding:8px; text-align:right; font-size:12px; color:${orderProfitColor};">$${orderProfit.toFixed(2)}</td>
+                  <td style="padding:8px; text-align:right; font-size:12px; color:${orderROIColor};">${orderROI}${orderROI !== 'N/A' ? '%' : ''}</td>
+                </tr>
+              `);
+            });
+          }
+        });
+
+        tbody.innerHTML = rows.join('');
+
+        // Add totals footer
+        const avgTotalROI = totalCOGS > 0 ? ((totalProfit / totalCOGS) * 100).toFixed(1) : 'N/A';
+
+        tfoot.innerHTML = `
+          <tr>
+            <td style="padding:12px 8px;" colspan="2"><strong>TOTALS (${Object.keys(grouped).length} unique products, ${totalOrders} orders)</strong></td>
+            <td style="padding:12px 8px; text-align:center; font-weight:600;">${totalOrders}</td>
+            <td style="padding:12px 8px;"></td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${totalRevenue.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${totalEarnings.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right;">$${totalCOGS.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:${totalProfit > 0 ? '#22c55e' : '#ef4444'};">$${totalProfit.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:${avgTotalROI !== 'N/A' ? '#22c55e' : '#94a3b8'};">${avgTotalROI}${avgTotalROI !== 'N/A' ? '%' : ''}</td>
+          </tr>
+        `;
+
+        // Update summary stats
+        document.getElementById('marketplaceTotalOrders').textContent = totalOrders;
+        document.getElementById('marketplaceRevenue').textContent = `$${totalRevenue.toFixed(0)}`;
+        document.getElementById('marketplaceEarnings').textContent = `$${totalEarnings.toFixed(0)}`;
+        document.getElementById('marketplaceProfit').textContent = `$${totalProfit.toFixed(0)}`;
+
       } catch (error) {
-        container.innerHTML = `<div class="danger">❌ Error loading orders: ${error.message}</div>`;
+        tbody.innerHTML = `
+          <tr><td colspan="9" style="padding:20px; text-align:center;" class="danger">❌ Error loading orders: ${error.message}</td></tr>
+        `;
       }
+    }
+
+    function toggleMarketplaceExpand(productName, rowElement) {
+      if (expandedMarketplaceRows.has(productName)) {
+        expandedMarketplaceRows.delete(productName);
+      } else {
+        expandedMarketplaceRows.add(productName);
+      }
+      loadMarketplace();
     }
 
     // Initialize
