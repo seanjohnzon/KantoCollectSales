@@ -7,7 +7,7 @@ All endpoints require admin authentication.
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional, List
-from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile, status
 from sqlmodel import Session, select
 
 from app.api.deps import AdminUser
@@ -171,6 +171,7 @@ async def import_excel_file(
     current_user: AdminUser,
     db: Session = Depends(get_whatnot_db),
     file: UploadFile = File(...),
+    sheet_name: Optional[str] = Form(None),
 ) -> ImportResult:
     """
     Import WhatNot sales from Excel file.
@@ -179,6 +180,10 @@ async def import_excel_file(
     - Row 1: Show name (e.g., "💎💎 FREE PACKS...")
     - Row 2: Column headers
     - Row 3+: Transaction data (show date extracted from first transaction)
+
+    Args:
+        file: Excel file to import
+        sheet_name: Optional sheet name (for multi-sheet files)
     """
     # Validate file type
     if not file.filename.endswith(('.xlsx', '.xls')):
@@ -190,7 +195,7 @@ async def import_excel_file(
 
     # Import
     try:
-        result = import_excel_show(db, str(temp_path))
+        result = import_excel_show(db, str(temp_path), sheet_name=sheet_name)
     finally:
         # Cleanup temp file
         if temp_path.exists():

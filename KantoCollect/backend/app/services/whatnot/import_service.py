@@ -175,7 +175,8 @@ def get_or_create_buyer(
 
 def import_excel_show(
     session: Session,
-    file_path: str
+    file_path: str,
+    sheet_name: Optional[str] = None
 ) -> ImportResult:
     """
     Import an Excel file as a WhatNot show.
@@ -201,6 +202,7 @@ def import_excel_show(
     Args:
         session: Database session
         file_path: Path to Excel file
+        sheet_name: Optional sheet name (for multi-sheet files)
 
     Returns:
         ImportResult with statistics and any errors
@@ -216,12 +218,12 @@ def import_excel_show(
 
     # Parse Excel - read first row to get show name
     try:
-        df_header = pd.read_excel(file_path, header=None, nrows=2)
+        df_header = pd.read_excel(file_path, sheet_name=sheet_name, header=None, nrows=2)
         # Row 1 contains the show name (row 0 is month title)
         show_name = str(df_header.iloc[1, 0]) if len(df_header) > 1 else "Imported Show"
 
         # Read actual data with header on row 2
-        df = pd.read_excel(file_path, header=2)
+        df = pd.read_excel(file_path, sheet_name=sheet_name, header=2)
 
         # Clean column names (remove trailing spaces)
         df.columns = df.columns.str.strip()
