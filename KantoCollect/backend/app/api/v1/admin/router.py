@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from .deal_analyzer import router as deal_analyzer_router
 from .inventory import router as inventory_router
 from .cards import router as cards_router
+from .whatnot import router as whatnot_router
 
 router = APIRouter()
 
@@ -31,4 +32,11 @@ router.include_router(
     cards_router,
     prefix="/cards",
     tags=["Card Database"],
+)
+
+# WhatNot Sales endpoints
+router.include_router(
+    whatnot_router,
+    prefix="/whatnot",
+    tags=["WhatNot Sales"],
 )

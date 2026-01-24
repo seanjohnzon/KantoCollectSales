@@ -14,6 +14,8 @@ from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.database import init_db
+from app.core.inventory_database import init_inventory_db
+from app.core.whatnot_database import init_whatnot_db
 from app.api.v1.router import api_router
 
 # Static files directory (backend/app/main.py -> KantoCollect/apps/admin-dashboard)
@@ -31,7 +33,11 @@ async def lifespan(app: FastAPI):
     print(f"🚀 Starting {settings.app_name}...")
     await init_db()
     print("✅ Database initialized")
-    
+    init_inventory_db()
+    print("✅ Inventory database initialized")
+    init_whatnot_db()
+    print("✅ WhatNot sales database initialized")
+
     yield
     
     # Shutdown
@@ -110,3 +116,12 @@ async def calendar_ui():
     if html_file.exists():
         return FileResponse(html_file, media_type="text/html")
     return {"message": "Calendar & Tasks - Coming Soon"}
+
+
+@app.get("/whatnot-sales")
+async def whatnot_sales_ui():
+    """Serve the WhatNot Sales Tracker UI."""
+    html_file = STATIC_DIR / "whatnot-sales" / "index.html"
+    if html_file.exists():
+        return FileResponse(html_file, media_type="text/html")
+    return {"message": "WhatNot Sales - Loading..."}

@@ -37,11 +37,18 @@ class Settings(BaseSettings):
     # Database - SQLite by default for local dev, PostgreSQL for production
     # Override in .env with: DATABASE_URL=postgresql://user:pass@localhost:5432/kantocollect
     database_url: str = "sqlite:///./kantocollect.db"
-    
+
+    # Inventory database (separate from core DB to avoid data mixing)
+    inventory_database_url: str = "sqlite:///./inventory.db"
+
+    # WhatNot sales database (separate from core and inventory DBs)
+    whatnot_database_url: str = "sqlite:///./whatnot_sales.db"
+
     # Authentication
     jwt_secret_key: str = "change-this-jwt-secret"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
+    admin_key: str = "1453"  # Simple admin key for quick access
     
     # PriceCharting API
     pricecharting_api_key: Optional[str] = None

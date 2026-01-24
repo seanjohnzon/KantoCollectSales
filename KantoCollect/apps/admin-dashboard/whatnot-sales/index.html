@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WhatNot Sales Tracker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { padding: 24px; background: #111827; border-bottom: 1px solid #1f2937; }
+    main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+    h1 { margin: 0; font-size: 24px; }
+    h2 { font-size: 18px; margin: 0 0 16px; }
+    .card { background: #111827; padding: 16px; border-radius: 12px; border: 1px solid #1f2937; margin-bottom: 16px; }
+    label { display: block; margin: 8px 0 4px; font-size: 12px; color: #94a3b8; }
+    input, select, textarea, button { padding: 8px 10px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; font-family: inherit; font-size: 14px; }
+    textarea { width: 100%; min-height: 60px; }
+    button { cursor: pointer; background: #22c55e; border-color: #22c55e; color: #0f172a; font-weight: 600; transition: all 0.2s; }
+    button:hover { opacity: 0.9; transform: translateY(-1px); }
+    button.secondary { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+    button.danger { background: #ef4444; border-color: #ef4444; color: white; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .muted { color: #94a3b8; font-size: 12px; }
+    .success { color: #22c55e; }
+    .warning { color: #f59e0b; }
+    .danger { color: #ef4444; }
+
+    /* Tabs */
+    .tabs { display: none; gap: 8px; border-bottom: 1px solid #1f2937; margin-bottom: 24px; }
+    .tab { padding: 12px 20px; cursor: pointer; color: #94a3b8; border-radius: 8px 8px 0 0; transition: all 0.2s; }
+    .tab:hover { background: #111827; }
+    .tab.active { background: #111827; color: #e2e8f0; border-bottom: 2px solid #22c55e; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Stats */
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+    /* Spinner animation */
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid #1f2937;
+      border-top-color: #22c55e;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .stat-card { background: #111827; padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #1f2937; }
+    .stat-value { font-size: 32px; font-weight: 700; color: #22c55e; margin-bottom: 4px; }
+    .stat-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Tags */
+    .tag-input { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; min-height: 40px; }
+    .tag { background: #22c55e; color: #0f172a; padding: 4px 8px; border-radius: 6px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+    .tag .remove { cursor: pointer; font-weight: bold; }
+
+    /* Table */
+    table { border: 1px solid #1f2937; }
+    th { color: #e2e8f0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { color: #cbd5e1; }
+
+    /* Modal */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; z-index: 1000; }
+    .modal.active { display: flex; }
+    .modal-content { background: #111827; padding: 24px; border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; border: 1px solid #1f2937; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .modal-close { cursor: pointer; font-size: 24px; color: #94a3b8; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #1f2937; }
+    th { color: #94a3b8; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+    tr:hover { background: #0f172a; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎬 WhatNot Sales Tracker</h1>
+    <div class="muted">Track stream sales, auto-assign COGS, analyze performance</div>
+  </header>
+  <main>
+    <!-- Admin Lock/Unlock -->
+    <div class="card">
+      <h2>🔐 Admin Access</h2>
+      <div class="row">
+        <input id="adminPin" type="password" placeholder="Enter PIN" style="width:150px;" maxlength="4" />
+        <button onclick="enableAdmin()" id="enableBtn">Enable Admin</button>
+        <button class="secondary" onclick="disableAdmin()" id="disableBtn" style="display:none;">Disable Admin</button>
+        <span id="adminStatus" class="muted">🔒 Locked</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('import')">📤 Import</div>
+      <div class="tab" onclick="showTab('catalog')">🏪 Product Catalog</div>
+      <div class="tab" onclick="showTab('cogs-rules')">⭐ COGS Rules</div>
+      <div class="tab" onclick="showTab('shows')">🎬 Shows</div>
+      <div class="tab" onclick="showTab('marketplace')">🛒 Marketplace</div>
+      <div class="tab" onclick="showTab('products')">📦 Products</div>
+      <div class="tab" onclick="showTab('buyers')">👥 Buyers</div>
+      <div class="tab" onclick="showTab('analytics')">📊 Analytics</div>
+    </div>
+
+    <!-- IMPORT TAB -->
+    <div id="import-tab" class="tab-content active">
+      <div class="card">
+        <h2>📤 Import Excel File</h2>
+        <p class="muted">Upload your WhatNot sales Excel file. Show name and date will be automatically extracted.</p>
+        <label for="excelFile">Select Excel File</label>
+        <input id="excelFile" type="file" accept=".xlsx,.xls" />
+        <div class="row" style="margin-top:12px;">
+          <button onclick="uploadExcel()">Upload & Import</button>
+          <span id="importStatus" class="muted"></span>
+        </div>
+        <div id="importResults" style="margin-top:16px;"></div>
+      </div>
+
+      <div class="card">
+        <h2>📋 Recent Imports</h2>
+        <div id="recentImports" class="grid"></div>
+      </div>
+    </div>
+
+    <!-- PRODUCT CATALOG TAB -->
+    <div id="catalog-tab" class="tab-content">
+      <div class="card">
+        <h2>🏪 Product Catalog - Assign COGS</h2>
+        <p class="muted">Set COGS for your products. Keywords will auto-match transactions.</p>
+        <div id="catalogGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- COGS RULES TAB -->
+    <div id="cogs-rules-tab" class="tab-content">
+      <div class="card">
+        <div class="row" style="margin-bottom:16px;">
+          <h2 style="flex:1;">⭐ COGS Mapping Rules</h2>
+          <button onclick="openNewRuleModal()">+ New Rule</button>
+        </div>
+        <div id="cogsRulesList"></div>
+      </div>
+    </div>
+
+    <!-- SHOWS TAB -->
+    <div id="shows-tab" class="tab-content">
+      <div class="card">
+        <h2>🎬 WhatNot Stream Sales</h2>
+        <p class="muted" style="margin-bottom:16px;">Detailed overview of all stream sales and performance metrics</p>
+
+        <!-- Summary Stats -->
+        <div class="stat-grid" style="margin-bottom:24px;">
+          <div class="stat-card">
+            <div class="stat-value" id="totalShowsCount">0</div>
+            <div class="stat-label">Total Shows</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="totalRevenue">$0</div>
+            <div class="stat-label">Total Revenue</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="totalEarnings">$0</div>
+            <div class="stat-label">Total Earnings</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="avgROI">0%</div>
+            <div class="stat-label">Average ROI</div>
+          </div>
+        </div>
+
+        <!-- Shows Table -->
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#1f2937; text-align:left; border-bottom:2px solid #22c55e;">
+                <th style="padding:12px 8px; font-weight:600;">Date</th>
+                <th style="padding:12px 8px; font-weight:600;">Show Name</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Revenue</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Commission</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Earnings</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total COGS</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Net Profit</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">ROI %</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:center;">Items</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:center;">Buyers</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Avg Order</th>
+              </tr>
+            </thead>
+            <tbody id="showsTableBody">
+              <tr>
+                <td colspan="11" style="padding:20px; text-align:center;" class="muted">Loading shows...</td>
+              </tr>
+            </tbody>
+            <tfoot id="showsTableFooter" style="background:#1f2937; border-top:2px solid #22c55e; font-weight:600;">
+              <!-- Totals row will be added here -->
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- MARKETPLACE TAB -->
+    <div id="marketplace-tab" class="tab-content">
+      <div class="card">
+        <h2>🛒 Marketplace Orders</h2>
+        <p class="muted">Import and manage WhatNot marketplace orders (non-stream sales)</p>
+
+        <!-- Import Section -->
+        <div style="margin-top:16px; padding:16px; background:#111827; border-radius:8px;">
+          <h3 style="margin-bottom:12px;">Import Marketplace Excel</h3>
+          <div class="row">
+            <input type="file" id="marketplaceFile" accept=".xlsx,.xls" style="flex:1;" />
+            <button onclick="uploadMarketplace()">Upload & Import</button>
+          </div>
+          <div id="marketplaceImportStatus" style="margin-top:12px;"></div>
+          <div id="marketplaceImportResults" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- Orders List -->
+        <div style="margin-top:24px;">
+          <h3 style="margin-bottom:12px;">Recent Orders</h3>
+          <div id="marketplaceOrders" class="grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCTS TAB -->
+    <div id="products-tab" class="tab-content">
+      <div class="card">
+        <h2>📦 Product Performance</h2>
+        <div class="row" style="margin-bottom:12px;">
+          <input id="productSearch" placeholder="Search products..." style="flex:1;" />
+          <select id="productFilter" onchange="loadProducts()">
+            <option value="all">All Products</option>
+            <option value="has_cogs">Has COGS</option>
+            <option value="missing_cogs">Missing COGS</option>
+          </select>
+        </div>
+        <div id="productsList" class="grid"></div>
+      </div>
+    </div>
+
+    <!-- BUYERS TAB -->
+    <div id="buyers-tab" class="tab-content">
+      <div class="card">
+        <h2>👥 Buyer Analytics</h2>
+        <div class="row" style="margin-bottom:12px;">
+          <input id="buyerSearch" placeholder="Search buyers..." style="flex:1;" />
+          <button class="secondary" onclick="loadBuyers(true)">Repeat Buyers Only</button>
+        </div>
+        <div id="buyersList" class="grid"></div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS TAB -->
+    <div id="analytics-tab" class="tab-content">
+      <div id="analyticsStats" class="stat-grid"></div>
+      <div class="grid">
+        <div class="card">
+          <h2>🏆 Top Products</h2>
+          <div id="topProducts"></div>
+        </div>
+        <div class="card">
+          <h2>👑 Top Buyers</h2>
+          <div id="topBuyers"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>⭐ COGS Rule Performance</h2>
+        <div id="rulePerformance"></div>
+      </div>
+    </div>
+
+    <!-- COGS Rule Modal -->
+    <div id="cogsRuleModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="ruleModalTitle">New COGS Rule</h2>
+          <span class="modal-close" onclick="closeRuleModal()">×</span>
+        </div>
+        <label for="ruleName">Rule Name</label>
+        <input id="ruleName" placeholder="e.g., One Piece AA Cards" />
+
+        <label>Keywords (press Enter to add)</label>
+        <div id="keywordTags" class="tag-input">
+          <input id="keywordInput" placeholder="Type keyword..." style="border:none;flex:1;background:transparent;" onkeydown="handleKeywordEnter(event)" />
+        </div>
+
+        <label for="matchType">Match Type</label>
+        <select id="matchType">
+          <option value="contains">Contains</option>
+          <option value="starts_with">Starts With</option>
+          <option value="ends_with">Ends With</option>
+          <option value="exact">Exact Match</option>
+        </select>
+
+        <label for="cogsAmount">COGS Amount ($)</label>
+        <input id="cogsAmount" type="number" step="0.01" placeholder="25.00" />
+
+        <label for="priority">Priority (higher = checked first)</label>
+        <input id="priority" type="number" value="50" />
+
+        <label for="category">Category (optional)</label>
+        <input id="category" placeholder="e.g., One Piece Cards" />
+
+        <label for="notes">Notes (optional)</label>
+        <textarea id="notes" placeholder="Description of what this rule covers..."></textarea>
+
+        <div class="row" style="margin-top:16px;">
+          <button onclick="saveRule()">Save Rule</button>
+          <button class="secondary" onclick="testRule()">Test Rule</button>
+          <button class="secondary" onclick="closeRuleModal()">Cancel</button>
+        </div>
+        <div id="ruleTestResults" style="margin-top:12px;"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const apiBase = "/api/v1/admin/whatnot";
+    let currentKeywords = [];
+    let editingRuleId = null;
+    let adminEnabled = false;
+    let adminKey = null;
+
+    // Admin lock/unlock
+    function enableAdmin() {
+      const pin = document.getElementById("adminPin").value;
+      if (pin === "1453") {
+        adminEnabled = true;
+        adminKey = "1453";
+        document.getElementById("adminStatus").innerHTML = '✅ Admin Enabled';
+        document.getElementById("adminStatus").className = 'success';
+        document.getElementById("enableBtn").style.display = 'none';
+        document.getElementById("disableBtn").style.display = 'inline-block';
+        document.getElementById("adminPin").value = '';
+        document.querySelector('.tabs').style.display = 'flex';
+        updateUIForAdminMode();
+        showTab('catalog');
+      } else {
+        alert('Invalid PIN');
+      }
+    }
+
+    function disableAdmin() {
+      adminEnabled = false;
+      adminKey = null;
+      document.getElementById("adminStatus").innerHTML = '👁️ View Only';
+      document.getElementById("adminStatus").className = 'muted';
+      document.getElementById("enableBtn").style.display = 'inline-block';
+      document.getElementById("disableBtn").style.display = 'none';
+      updateUIForAdminMode();
+    }
+
+    function updateUIForAdminMode() {
+      // Hide/show admin-only tabs
+      const importTab = document.querySelector('.tab[onclick*="import"]');
+      const rulesTab = document.querySelector('.tab[onclick*="cogs-rules"]');
+      const catalogTab = document.querySelector('.tab[onclick*="catalog"]');
+
+      importTab.style.display = adminEnabled ? 'block' : 'none';
+      rulesTab.style.display = adminEnabled ? 'block' : 'none';
+      catalogTab.style.display = adminEnabled ? 'block' : 'none';
+
+      // If disabling admin and currently on an admin-only tab, switch to Shows
+      if (!adminEnabled) {
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab && (activeTab.textContent.includes('Import') ||
+                          activeTab.textContent.includes('COGS Rules') ||
+                          activeTab.textContent.includes('Product Catalog'))) {
+          showTab('shows');
+        }
+      }
+
+      // Hide/show all Save buttons and input fields
+      document.querySelectorAll('input[type="number"]').forEach(input => {
+        input.disabled = !adminEnabled;
+        input.style.opacity = adminEnabled ? '1' : '0.5';
+      });
+
+      document.querySelectorAll('button').forEach(btn => {
+        if (btn.textContent.includes('Save') || btn.textContent.includes('Upload') || btn.textContent.includes('New Rule')) {
+          btn.style.display = adminEnabled ? 'inline-block' : 'none';
+        }
+      });
+    }
+
+    function authHeaders() {
+      return adminKey ? { "Authorization": `Bearer ${adminKey}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+    }
+
+    // Tab management
+    function showTab(tabName) {
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelector(`.tab[onclick*="${tabName}"]`).classList.add('active');
+      document.getElementById(`${tabName}-tab`).classList.add('active');
+
+      // Load data for active tab
+      if (tabName === 'import') loadRecentImports();
+      if (tabName === 'catalog') loadCatalog();
+      if (tabName === 'cogs-rules') loadCogsRules();
+      if (tabName === 'shows') loadShows();
+      if (tabName === 'marketplace') loadMarketplace();
+      if (tabName === 'products') loadProducts();
+      if (tabName === 'buyers') loadBuyers();
+      if (tabName === 'analytics') loadAnalytics();
+    }
+
+    // Excel Import
+    async function uploadExcel() {
+      const fileInput = document.getElementById("excelFile");
+
+      if (!fileInput.files[0]) {
+        document.getElementById("importStatus").innerHTML = '<span class="warning">⚠ Please select an Excel file</span>';
+        return;
+      }
+
+      const fileName = fileInput.files[0].name;
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      // Show detailed progress
+      const statusEl = document.getElementById("importStatus");
+      const resultsEl = document.getElementById("importResults");
+
+      statusEl.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="spinner"></div>
+          <div>
+            <div style="font-weight:600; margin-bottom:4px;">📤 Importing ${fileName}...</div>
+            <div class="muted" style="font-size:11px;">Parsing Excel → Creating transactions → Matching COGS rules</div>
+          </div>
+        </div>
+      `;
+      resultsEl.innerHTML = '';
+
+      try {
+        const startTime = Date.now();
+
+        const res = await fetch(`${apiBase}/import/excel`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${adminKey}` },
+          body: formData
+        });
+
+        const result = await res.json();
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        if (res.ok) {
+          const cogsPct = result.imported > 0 ? ((result.cogs_assigned_count / result.imported) * 100).toFixed(0) : 0;
+
+          statusEl.innerHTML = `<div class="success" style="font-weight:600;">✅ Import Complete (${elapsed}s)</div>`;
+
+          resultsEl.innerHTML = `
+            <div class="card" style="background:#111827; border:1px solid #22c55e;">
+              <div style="font-weight:600; margin-bottom:12px; color:#22c55e;">📊 Import Summary</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div>
+                  <div class="muted" style="font-size:11px; margin-bottom:4px;">TRANSACTIONS</div>
+                  <div style="font-size:20px; font-weight:600;">${result.imported}</div>
+                  <div class="muted" style="font-size:11px;">from ${result.total_rows} rows</div>
+                </div>
+                <div>
+                  <div class="muted" style="font-size:11px; margin-bottom:4px;">COGS COVERAGE</div>
+                  <div style="font-size:20px; font-weight:600; color:${cogsPct >= 80 ? '#22c55e' : cogsPct >= 50 ? '#f59e0b' : '#ef4444'}">${cogsPct}%</div>
+                  <div class="muted" style="font-size:11px;">${result.cogs_assigned_count} / ${result.imported} assigned</div>
+                </div>
+              </div>
+              ${result.cogs_missing_count > 0 ? `
+                <div style="margin-top:12px; padding:8px; background:#1f2937; border-radius:6px;">
+                  <div class="warning">⚠ ${result.cogs_missing_count} transactions need COGS rules</div>
+                  <div class="muted" style="font-size:11px; margin-top:4px;">Go to Product Catalog to assign COGS</div>
+                </div>
+              ` : ''}
+              ${result.errors.length > 0 ? `
+                <div style="margin-top:12px; padding:8px; background:#1f2937; border-radius:6px;">
+                  <div class="danger">❌ ${result.errors.length} errors:</div>
+                  ${result.errors.map(e => `<div class="muted" style="font-size:11px;">• ${e}</div>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+
+          loadRecentImports();
+          fileInput.value = '';
+        } else {
+          statusEl.innerHTML = `<div class="danger" style="font-weight:600;">❌ Import Failed</div>`;
+          resultsEl.innerHTML = `
+            <div class="card" style="background:#1f2937; border:1px solid #ef4444;">
+              <div class="danger">${result.detail || 'Unknown error'}</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        statusEl.innerHTML = `<div class="danger" style="font-weight:600;">❌ Import Failed</div>`;
+        resultsEl.innerHTML = `
+          <div class="card" style="background:#1f2937; border:1px solid #ef4444;">
+            <div class="danger">${error.message}</div>
+          </div>
+        `;
+      }
+    }
+
+    async function loadRecentImports() {
+      const res = await fetch(`${apiBase}/shows?limit=5`, { headers: authHeaders() });
+      const shows = await res.json();
+      const container = document.getElementById("recentImports");
+      container.innerHTML = shows.map(show => `
+        <div class="card">
+          <strong>${show.show_date}</strong> - ${show.show_name || 'Unnamed'}<br>
+          <span class="muted">${show.item_count} items • $${show.total_gross_sales}</span>
+        </div>
+      `).join('');
+    }
+
+    // COGS Rules
+    async function loadCogsRules() {
+      const res = await fetch(`${apiBase}/cogs-rules`, { headers: authHeaders() });
+      const rules = await res.json();
+      const container = document.getElementById("cogsRulesList");
+
+      if (rules.length === 0) {
+        container.innerHTML = '<div class="muted">No COGS rules yet. Create one to auto-assign costs!</div>';
+        return;
+      }
+
+      container.innerHTML = rules.map(rule => `
+        <div class="card">
+          <div class="row" style="margin-bottom:8px;">
+            <strong style="flex:1;">${rule.rule_name}</strong>
+            <span class="muted">Priority: ${rule.priority}</span>
+            ${rule.is_active ? '<span class="success">✓ Active</span>' : '<span class="muted">Disabled</span>'}
+          </div>
+          <div class="muted">Keywords: ${rule.keywords.join(', ')}</div>
+          <div>COGS: <strong>$${rule.cogs_amount}</strong> | Match: ${rule.match_type}</div>
+          <div class="row" style="margin-top:12px;">
+            <button class="secondary" onclick="editRule(${rule.id})">Edit</button>
+            <button class="secondary" onclick="toggleRule(${rule.id})">${rule.is_active ? 'Disable' : 'Enable'}</button>
+            <button class="danger" onclick="deleteRule(${rule.id})">Delete</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openNewRuleModal() {
+      editingRuleId = null;
+      currentKeywords = [];
+      document.getElementById("ruleModalTitle").textContent = "New COGS Rule";
+      document.getElementById("ruleName").value = "";
+      document.getElementById("cogsAmount").value = "";
+      document.getElementById("priority").value = "50";
+      document.getElementById("matchType").value = "contains";
+      document.getElementById("category").value = "";
+      document.getElementById("notes").value = "";
+      updateKeywordTags();
+      document.getElementById("cogsRuleModal").classList.add("active");
+    }
+
+    function closeRuleModal() {
+      document.getElementById("cogsRuleModal").classList.remove("active");
+      document.getElementById("ruleTestResults").innerHTML = "";
+    }
+
+    function handleKeywordEnter(event) {
+      if (event.key === 'Enter' && event.target.value.trim()) {
+        currentKeywords.push(event.target.value.trim());
+        event.target.value = '';
+        updateKeywordTags();
+        event.preventDefault();
+      }
+    }
+
+    function removeKeyword(index) {
+      currentKeywords.splice(index, 1);
+      updateKeywordTags();
+    }
+
+    function updateKeywordTags() {
+      const container = document.getElementById("keywordTags");
+      const input = document.getElementById("keywordInput");
+      container.innerHTML = currentKeywords.map((kw, i) =>
+        `<span class="tag">${kw}<span class="remove" onclick="removeKeyword(${i})">×</span></span>`
+      ).join('') + input.outerHTML;
+    }
+
+    async function saveRule() {
+      const data = {
+        rule_name: document.getElementById("ruleName").value,
+        keywords: currentKeywords,
+        cogs_amount: parseFloat(document.getElementById("cogsAmount").value),
+        match_type: document.getElementById("matchType").value,
+        priority: parseInt(document.getElementById("priority").value),
+        category: document.getElementById("category").value || null,
+        notes: document.getElementById("notes").value || null
+      };
+
+      if (!data.rule_name || currentKeywords.length === 0 || !data.cogs_amount) {
+        alert("Name, keywords, and COGS amount are required");
+        return;
+      }
+
+      const url = editingRuleId ? `${apiBase}/cogs-rules/${editingRuleId}` : `${apiBase}/cogs-rules`;
+      const method = editingRuleId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: authHeaders(),
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        closeRuleModal();
+        loadCogsRules();
+      } else {
+        alert("Error saving rule");
+      }
+    }
+
+    async function testRule() {
+      const data = {
+        rule_name: "Test",
+        keywords: currentKeywords,
+        cogs_amount: parseFloat(document.getElementById("cogsAmount").value) || 0,
+        match_type: document.getElementById("matchType").value,
+        priority: 50
+      };
+
+      const res = await fetch(`${apiBase}/cogs-rules/test`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(data)
+      });
+
+      const result = await res.json();
+      document.getElementById("ruleTestResults").innerHTML = result.matches.length > 0
+        ? `<div class="success">✓ Would match ${result.match_count} products:</div><div class="muted">${result.matches.slice(0,5).join(', ')}${result.matches.length > 5 ? '...' : ''}</div>`
+        : '<div class="warning">⚠ No matches found</div>';
+    }
+
+    async function toggleRule(id) {
+      await fetch(`${apiBase}/cogs-rules/${id}/toggle`, {
+        method: "POST",
+        headers: authHeaders()
+      });
+      loadCogsRules();
+    }
+
+    async function deleteRule(id) {
+      if (!confirm("Delete this COGS rule?")) return;
+      await fetch(`${apiBase}/cogs-rules/${id}`, {
+        method: "DELETE",
+        headers: authHeaders()
+      });
+      loadCogsRules();
+    }
+
+    // Shows
+    async function loadShows() {
+      try {
+        const res = await fetch(`${apiBase}/shows?limit=100`, { headers: authHeaders() });
+        const shows = await res.json();
+
+        const tbody = document.getElementById("showsTableBody");
+        const tfoot = document.getElementById("showsTableFooter");
+
+        if (shows.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="11" style="padding:20px; text-align:center;" class="muted">No shows imported yet. Go to Import tab to upload your first Excel file!</td></tr>';
+          return;
+        }
+
+        // Calculate totals
+        let totalRevenue = 0;
+        let totalCommission = 0;
+        let totalEarnings = 0;
+        let totalCOGS = 0;
+        let totalProfit = 0;
+        let totalItems = 0;
+        let totalBuyers = 0;
+        let showsWithCOGS = 0;
+
+        // Render table rows
+        tbody.innerHTML = shows.map(show => {
+          const revenue = parseFloat(show.total_gross_sales || 0);
+          const commission = parseFloat(show.total_whatnot_commission || 0) + parseFloat(show.total_whatnot_fees || 0);
+          const earnings = parseFloat(show.total_net_earnings || 0);
+          const cogs = parseFloat(show.total_cogs || 0);
+          const profit = parseFloat(show.total_net_profit || 0);
+          const items = parseInt(show.item_count || 0);
+          const buyers = parseInt(show.unique_buyers || 0);
+          const avgOrder = buyers > 0 ? (revenue / buyers).toFixed(2) : '0.00';
+          const roi = cogs > 0 ? ((profit / cogs) * 100).toFixed(1) : 'N/A';
+
+          // Add to totals
+          totalRevenue += revenue;
+          totalCommission += commission;
+          totalEarnings += earnings;
+          totalCOGS += cogs;
+          totalProfit += profit;
+          totalItems += items;
+          totalBuyers += buyers;
+          if (cogs > 0) showsWithCOGS++;
+
+          // Format date
+          const date = new Date(show.show_date);
+          const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+          // Determine profit color
+          const profitColor = profit > 0 ? '#22c55e' : profit < 0 ? '#ef4444' : '#94a3b8';
+          const roiColor = roi !== 'N/A' ? (parseFloat(roi) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
+
+          // Truncate show name if too long
+          const showName = show.show_name.length > 50 ? show.show_name.substring(0, 47) + '...' : show.show_name;
+
+          return `
+            <tr style="border-bottom:1px solid #1f2937; transition:background 0.2s;" onmouseover="this.style.background='#111827'" onmouseout="this.style.background='transparent'">
+              <td style="padding:12px 8px; white-space:nowrap;">${dateStr}</td>
+              <td style="padding:12px 8px;">
+                <div style="font-weight:500;">${showName}</div>
+              </td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600;">$${revenue.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right;" class="muted">$${commission.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${earnings.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right;" class="muted">$${cogs > 0 ? cogs.toFixed(2) : '-'}</td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600; color:${profitColor};">$${profit.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600; color:${roiColor};">${roi}${roi !== 'N/A' ? '%' : ''}</td>
+              <td style="padding:12px 8px; text-align:center;" class="muted">${items}</td>
+              <td style="padding:12px 8px; text-align:center;" class="muted">${buyers}</td>
+              <td style="padding:12px 8px; text-align:right;" class="muted">$${avgOrder}</td>
+            </tr>
+          `;
+        }).join('');
+
+        // Add totals footer
+        const avgROI = totalCOGS > 0 ? ((totalProfit / totalCOGS) * 100).toFixed(1) : 'N/A';
+        const avgOrderTotal = totalBuyers > 0 ? (totalRevenue / totalBuyers).toFixed(2) : '0.00';
+
+        tfoot.innerHTML = `
+          <tr>
+            <td style="padding:12px 8px;" colspan="2"><strong>TOTALS (${shows.length} shows)</strong></td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${totalRevenue.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right;">$${totalCommission.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${totalEarnings.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right;">$${totalCOGS.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:${totalProfit > 0 ? '#22c55e' : '#ef4444'};">$${totalProfit.toFixed(2)}</td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:${avgROI !== 'N/A' ? '#22c55e' : '#94a3b8'};">${avgROI}${avgROI !== 'N/A' ? '%' : ''}</td>
+            <td style="padding:12px 8px; text-align:center;">${totalItems}</td>
+            <td style="padding:12px 8px; text-align:center;">${totalBuyers}</td>
+            <td style="padding:12px 8px; text-align:right;">$${avgOrderTotal}</td>
+          </tr>
+        `;
+
+        // Update summary stats
+        document.getElementById('totalShowsCount').textContent = shows.length;
+        document.getElementById('totalRevenue').textContent = `$${totalRevenue.toFixed(0)}`;
+        document.getElementById('totalEarnings').textContent = `$${totalEarnings.toFixed(0)}`;
+        document.getElementById('avgROI').textContent = avgROI !== 'N/A' ? `${avgROI}%` : 'N/A';
+
+      } catch (error) {
+        document.getElementById("showsTableBody").innerHTML = `
+          <tr><td colspan="11" style="padding:20px; text-align:center;" class="danger">❌ Error loading shows: ${error.message}</td></tr>
+        `;
+      }
+    }
+
+    // Products
+    async function loadProducts() {
+      const filter = document.getElementById("productFilter").value;
+      let url = `${apiBase}/products?limit=50`;
+      if (filter === 'has_cogs') url += '&has_cogs=true';
+      if (filter === 'missing_cogs') url += '&has_cogs=false';
+
+      const res = await fetch(url, { headers: authHeaders() });
+      const products = await res.json();
+      const container = document.getElementById("productsList");
+      container.innerHTML = products.map(p => `
+        <div class="card">
+          <strong>${p.product_name}</strong><br>
+          <div class="muted">Sold ${p.times_sold}x • Avg: $${p.avg_sale_price}</div>
+          <div>Total: <strong>$${p.total_gross_sales}</strong></div>
+          ${p.default_cogs ? `<div class="success">COGS: $${p.default_cogs}</div>` : '<div class="warning">⚠ Missing COGS</div>'}
+        </div>
+      `).join('');
+    }
+
+    // Buyers
+    async function loadBuyers(repeatOnly = false) {
+      const url = `${apiBase}/buyers?limit=50${repeatOnly ? '&repeat_only=true' : ''}`;
+      const res = await fetch(url, { headers: authHeaders() });
+      const buyers = await res.json();
+      const container = document.getElementById("buyersList");
+      container.innerHTML = buyers.map(b => `
+        <div class="card">
+          <strong>@${b.username}</strong> ${b.is_repeat_buyer ? '⭐' : ''}<br>
+          <div class="muted">${b.total_purchases} purchases • Avg: $${b.avg_purchase_price}</div>
+          <div>Total Spent: <strong>$${b.total_spent}</strong></div>
+        </div>
+      `).join('');
+    }
+
+    // Analytics
+    async function loadAnalytics() {
+      const res = await fetch(`${apiBase}/analytics/overview`, { headers: authHeaders() });
+      const data = await res.json();
+      const stats = document.getElementById("analyticsStats");
+
+      const cogsPct = data.cogs_coverage.coverage_percent || 0;
+      stats.innerHTML = `
+        <div class="stat-card">
+          <div class="stat-value">$${data.total_gross_sales}</div>
+          <div class="stat-label">Gross Sales</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">$${data.total_net_earnings}</div>
+          <div class="stat-label">Net Earnings</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">$${data.total_profit}</div>
+          <div class="stat-label">Net Profit</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${cogsPct.toFixed(0)}%</div>
+          <div class="stat-label">COGS Coverage</div>
+        </div>
+      `;
+
+      const topProds = await fetch(`${apiBase}/analytics/top-products?limit=5`, { headers: authHeaders() }).then(r => r.json());
+      document.getElementById("topProducts").innerHTML = topProds.map((p, i) =>
+        `<div>${i+1}. ${p.product_name} - $${p.total_revenue}</div>`
+      ).join('');
+
+      const topBuy = await fetch(`${apiBase}/analytics/top-buyers?limit=5`, { headers: authHeaders() }).then(r => r.json());
+      document.getElementById("topBuyers").innerHTML = topBuy.map((b, i) =>
+        `<div>${i+1}. @${b.username} - $${b.total_spent} (${b.purchase_count} purchases)</div>`
+      ).join('');
+
+      const rulePref = await fetch(`${apiBase}/analytics/cogs-rule-performance`, { headers: authHeaders() }).then(r => r.json());
+      document.getElementById("rulePerformance").innerHTML = rulePref.map(r =>
+        `<div><strong>${r.rule_name}:</strong> ${r.matches} matches, $${r.total_cogs_assigned} COGS assigned</div>`
+      ).join('');
+    }
+
+    // Product Catalog
+    async function loadCatalog() {
+      const grid = document.getElementById("catalogGrid");
+      grid.innerHTML = '<div class="muted">Loading products...</div>';
+
+      try {
+        const res = await fetch(`${apiBase}/product-catalog`, { headers: authHeaders() });
+
+        if (!res.ok) {
+          const error = await res.json();
+          grid.innerHTML = `<div class="danger">❌ Error loading products: ${error.detail || res.statusText}</div>
+                           <div class="muted">Make sure you have saved your admin token above.</div>`;
+          console.error('Product catalog error:', error);
+          return;
+        }
+
+        const data = await res.json();
+        console.log('Product catalog loaded:', data);
+
+        if (!data.products || data.products.length === 0) {
+          grid.innerHTML = '<div class="warning">⚠ No products found</div>';
+          return;
+        }
+
+        grid.innerHTML = data.products.map(p => `
+          <div class="card" style="padding:12px;">
+            <img src="${p.imageUrl}"
+                 style="width:100%; border-radius:8px; margin-bottom:8px;"
+                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22%3E%3Crect fill=%22%23333%22 width=%22300%22 height=%22300%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E%3C/svg%3E'; console.error('Failed to load: ${p.imageUrl}');"
+                 loading="lazy" />
+            <div style="font-size:14px; font-weight:600; margin-bottom:4px;">${p.name}</div>
+            <div class="muted" style="font-size:12px; margin-bottom:8px;">${p.category} | ${p.sales} sales | $${p.revenue} revenue</div>
+            <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Keywords: ${p.keywords.join(', ')}</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="number" id="cogs-${p.id}" placeholder="COGS" step="0.01" min="0" style="flex:1; padding:6px;">
+              <button onclick="saveCOGS(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${JSON.stringify(p.keywords)})" style="padding:6px 12px; font-size:12px;">Save</button>
+            </div>
+          </div>
+        `).join('');
+
+        // Log first few image URLs for debugging
+        console.log('Sample image URLs:', data.products.slice(0, 3).map(p => p.imageUrl));
+      } catch (error) {
+        grid.innerHTML = `<div class="danger">❌ Error: ${error.message}</div>`;
+        console.error('Failed to load catalog:', error);
+      }
+    }
+
+    async function saveCOGS(productId, productName, keywords) {
+      const cogsInput = document.getElementById(`cogs-${productId}`);
+      const cogs = parseFloat(cogsInput.value);
+
+      if (!cogs || cogs <= 0) {
+        alert('Please enter a valid COGS amount');
+        return;
+      }
+
+      const res = await fetch(`${apiBase}/product-catalog/save-cogs`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: productId,
+          cogs: cogs,
+          keywords: keywords,
+          product_name: productName
+        })
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        alert(`✓ COGS rule created for ${productName}`);
+        cogsInput.style.background = '#22c55e33';
+      } else {
+        alert('Error saving COGS');
+      }
+    }
+
+    // Marketplace Import
+    async function uploadMarketplace() {
+      const fileInput = document.getElementById("marketplaceFile");
+
+      if (!fileInput.files[0]) {
+        document.getElementById("marketplaceImportStatus").innerHTML = '<span class="warning">⚠ Please select an Excel file</span>';
+        return;
+      }
+
+      const fileName = fileInput.files[0].name;
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+
+      const statusEl = document.getElementById("marketplaceImportStatus");
+      const resultsEl = document.getElementById("marketplaceImportResults");
+
+      statusEl.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="spinner"></div>
+          <div>
+            <div style="font-weight:600; margin-bottom:4px;">📤 Importing ${fileName}...</div>
+            <div class="muted" style="font-size:11px;">Parsing marketplace orders → Matching COGS rules</div>
+          </div>
+        </div>
+      `;
+      resultsEl.innerHTML = '';
+
+      try {
+        const startTime = Date.now();
+
+        const res = await fetch(`${apiBase}/import/marketplace`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${adminKey}` },
+          body: formData
+        });
+
+        const result = await res.json();
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        if (res.ok) {
+          const cogsPct = result.imported > 0 ? ((result.cogs_assigned_count / result.imported) * 100).toFixed(0) : 0;
+
+          statusEl.innerHTML = `<div class="success" style="font-weight:600;">✅ Import Complete (${elapsed}s)</div>`;
+
+          resultsEl.innerHTML = `
+            <div class="card" style="background:#111827; border:1px solid #22c55e;">
+              <div style="font-weight:600; margin-bottom:12px; color:#22c55e;">📊 Import Summary</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                <div>
+                  <div class="muted" style="font-size:11px; margin-bottom:4px;">MARKETPLACE ORDERS</div>
+                  <div style="font-size:20px; font-weight:600;">${result.imported}</div>
+                  <div class="muted" style="font-size:11px;">from ${result.total_rows} rows</div>
+                </div>
+                <div>
+                  <div class="muted" style="font-size:11px; margin-bottom:4px;">COGS COVERAGE</div>
+                  <div style="font-size:20px; font-weight:600; color:${cogsPct >= 80 ? '#22c55e' : cogsPct >= 50 ? '#f59e0b' : '#ef4444'}">${cogsPct}%</div>
+                  <div class="muted" style="font-size:11px;">${result.cogs_assigned_count} / ${result.imported} assigned</div>
+                </div>
+              </div>
+              ${result.cogs_missing_count > 0 ? `
+                <div style="margin-top:12px; padding:8px; background:#1f2937; border-radius:6px;">
+                  <div class="warning">⚠ ${result.cogs_missing_count} orders need COGS rules</div>
+                  <div class="muted" style="font-size:11px; margin-top:4px;">Go to COGS Rules or Product Catalog to assign COGS</div>
+                </div>
+              ` : ''}
+              ${result.errors.length > 0 ? `
+                <div style="margin-top:12px; padding:8px; background:#1f2937; border-radius:6px;">
+                  <div class="danger">❌ ${result.errors.length} errors:</div>
+                  ${result.errors.map(e => `<div class="muted" style="font-size:11px;">• ${e}</div>`).join('')}
+                </div>
+              ` : ''}
+            </div>
+          `;
+
+          loadMarketplace();
+          fileInput.value = '';
+        } else {
+          statusEl.innerHTML = `<div class="danger" style="font-weight:600;">❌ Import Failed</div>`;
+          resultsEl.innerHTML = `
+            <div class="card" style="background:#1f2937; border:1px solid #ef4444;">
+              <div class="danger">${result.detail || 'Unknown error'}</div>
+            </div>
+          `;
+        }
+      } catch (error) {
+        statusEl.innerHTML = `<div class="danger" style="font-weight:600;">❌ Import Failed</div>`;
+        resultsEl.innerHTML = `
+          <div class="card" style="background:#1f2937; border:1px solid #ef4444;">
+            <div class="danger">${error.message}</div>
+          </div>
+        `;
+      }
+    }
+
+    async function loadMarketplace() {
+      const container = document.getElementById("marketplaceOrders");
+      container.innerHTML = '<div class="muted">Loading orders...</div>';
+
+      try {
+        const res = await fetch(`${apiBase}/transactions?sale_type=marketplace&limit=50`, { headers: authHeaders() });
+        const orders = await res.json();
+
+        if (orders.length === 0) {
+          container.innerHTML = '<div class="muted">No marketplace orders yet. Import your first Excel file above!</div>';
+          return;
+        }
+
+        container.innerHTML = orders.map(o => `
+          <div class="card" style="padding:12px;">
+            <div style="font-size:14px; font-weight:600; margin-bottom:4px;">${o.item_name}</div>
+            <div class="muted" style="font-size:12px; margin-bottom:8px;">
+              ${new Date(o.transaction_date).toLocaleDateString()} | ${o.buyer_username}
+            </div>
+            <div class="row" style="justify-content:space-between; margin-bottom:4px;">
+              <span class="muted">Revenue:</span>
+              <span style="color:#22c55e; font-weight:600;">$${o.total_revenue || o.gross_sale_price}</span>
+            </div>
+            <div class="row" style="justify-content:space-between; margin-bottom:4px;">
+              <span class="muted">Net Earnings:</span>
+              <span>$${o.net_earnings}</span>
+            </div>
+            ${o.cogs ? `
+              <div class="row" style="justify-content:space-between; margin-bottom:4px;">
+                <span class="muted">COGS:</span>
+                <span>$${o.cogs}</span>
+              </div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="muted">Profit:</span>
+                <span style="color:#22c55e; font-weight:600;">$${o.net_profit} (${o.roi_percent}%)</span>
+              </div>
+            ` : `
+              <div style="margin-top:8px; padding:6px; background:#1f2937; border-radius:4px; text-align:center;">
+                <span class="warning">⚠ No COGS assigned</span>
+              </div>
+            `}
+            ${o.payment_status ? `
+              <div style="margin-top:8px;">
+                <span class="muted" style="font-size:11px;">Status: ${o.payment_status}</span>
+              </div>
+            ` : ''}
+          </div>
+        `).join('');
+      } catch (error) {
+        container.innerHTML = `<div class="danger">❌ Error loading orders: ${error.message}</div>`;
+      }
+    }
+
+    // Initialize
+    document.addEventListener("DOMContentLoaded", () => {
+      // Start in view-only mode - show tabs but disable editing
+      document.querySelector('.tabs').style.display = 'flex';
+      document.getElementById("adminStatus").innerHTML = '👁️ View Only';
+
+      // Hide admin-only tabs initially (Import, COGS Rules, Product Catalog)
+      const importTab = document.querySelector('.tab[onclick*="import"]');
+      const rulesTab = document.querySelector('.tab[onclick*="cogs-rules"]');
+      const catalogTab = document.querySelector('.tab[onclick*="catalog"]');
+      importTab.style.display = 'none';
+      rulesTab.style.display = 'none';
+      catalogTab.style.display = 'none';
+
+      // Show Shows tab by default (view-only mode)
+      showTab('shows');
+
+      // Allow Enter key to enable admin
+      document.getElementById("adminPin").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") enableAdmin();
+      });
+    });
+  </script>
+</body>
+</html>
