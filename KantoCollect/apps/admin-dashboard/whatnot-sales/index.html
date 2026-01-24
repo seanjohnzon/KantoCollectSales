@@ -130,65 +130,9 @@
     <!-- MASTER CATALOG TAB -->
     <div id="master-catalog-tab" class="tab-content">
       <div class="card">
-        <h2>📋 Master Catalog</h2>
-        <p class="muted" style="margin-bottom:16px;">Complete list of all products sold across shows and marketplace. COGS mapping will be applied once rules are created.</p>
-
-        <!-- Summary Stats -->
-        <div class="stat-grid" style="margin-bottom:24px;">
-          <div class="stat-card">
-            <div class="stat-value" id="catalogTotalProducts">0</div>
-            <div class="stat-label">Total Products</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="catalogTotalSales">0</div>
-            <div class="stat-label">Total Units Sold</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="catalogMappedCount">0</div>
-            <div class="stat-label">COGS Mapped (0%)</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value" id="catalogUnmappedCount">0</div>
-            <div class="stat-label">Needs Mapping</div>
-          </div>
-        </div>
-
-        <!-- Filter/Search -->
-        <div style="margin-bottom:16px; display:flex; gap:12px;">
-          <input id="catalogSearch" placeholder="Search products..." style="flex:1;" onkeyup="filterMasterCatalog()" />
-          <select id="catalogFilter" onchange="loadMasterCatalog()" style="width:200px;">
-            <option value="all">All Products</option>
-            <option value="mapped">COGS Mapped</option>
-            <option value="unmapped">Needs COGS</option>
-          </select>
-        </div>
-
-        <!-- Products Table -->
-        <div style="overflow-x:auto;">
-          <table style="width:100%; border-collapse:collapse; font-size:13px;">
-            <thead>
-              <tr style="background:#1f2937; text-align:left; border-bottom:2px solid #22c55e;">
-                <th style="padding:12px 8px; font-weight:600;">Product Name</th>
-                <th style="padding:12px 8px; font-weight:600; text-align:center;">Times Sold</th>
-                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Qty</th>
-                <th style="padding:12px 8px; font-weight:600; text-align:right;">Avg Price</th>
-                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Revenue</th>
-                <th style="padding:12px 8px; font-weight:600; text-align:right;">COGS/Unit</th>
-                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total COGS</th>
-                <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Profit</th>
-                <th style="padding:12px 8px; font-weight:600; text-align:center;">Status</th>
-              </tr>
-            </thead>
-            <tbody id="masterCatalogTableBody">
-              <tr>
-                <td colspan="9" style="padding:20px; text-align:center;" class="muted">Loading master catalog...</td>
-              </tr>
-            </tbody>
-            <tfoot id="masterCatalogTableFooter" style="background:#1f2937; border-top:2px solid #22c55e; font-weight:600;">
-              <!-- Totals row will be added here -->
-            </tfoot>
-          </table>
-        </div>
+        <h2>📋 Master Catalog - Assign COGS</h2>
+        <p class="muted">Set COGS for your products. Keywords will auto-match transactions.</p>
+        <div id="catalogGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-top:16px;"></div>
       </div>
     </div>
 
@@ -1346,136 +1290,81 @@
       ).join('');
     }
 
-    // Master Catalog
-    let allCatalogProducts = [];
-
+    // Master Catalog (with images and COGS assignment)
     async function loadMasterCatalog() {
-      const tbody = document.getElementById("masterCatalogTableBody");
-      const tfoot = document.getElementById("masterCatalogTableFooter");
-      const filter = document.getElementById("catalogFilter").value;
+      const grid = document.getElementById("catalogGrid");
+      grid.innerHTML = '<div class="muted">Loading products...</div>';
 
       try {
-        // Get all products from whatnot_products table
-        const res = await fetch(`${apiBase}/products?limit=1000`, { headers: authHeaders() });
-        const products = await res.json();
-        allCatalogProducts = products;
+        const res = await fetch(`${apiBase}/product-catalog`, { headers: authHeaders() });
 
-        if (products.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="muted">No products in catalog yet. Import shows or marketplace orders first.</td></tr>';
+        if (!res.ok) {
+          const error = await res.json();
+          grid.innerHTML = `<div class="danger">❌ Error loading products: ${error.detail || res.statusText}</div>
+                           <div class="muted">Make sure you have saved your admin token above.</div>`;
+          console.error('Product catalog error:', error);
           return;
         }
 
-        // Calculate stats
-        let totalProducts = products.length;
-        let totalSales = products.reduce((sum, p) => sum + (p.total_quantity_sold || 0), 0);
-        let mappedCount = 0; // For now 0 until we add COGS rules
-        let unmappedCount = totalProducts;
+        const data = await res.json();
+        console.log('Product catalog loaded:', data);
 
-        // Update summary stats
-        document.getElementById('catalogTotalProducts').textContent = totalProducts;
-        document.getElementById('catalogTotalSales').textContent = totalSales;
-        document.getElementById('catalogMappedCount').textContent = `${mappedCount} (0%)`;
-        document.getElementById('catalogUnmappedCount').textContent = unmappedCount;
-
-        // Filter products
-        let filteredProducts = products;
-        if (filter === 'mapped') {
-          filteredProducts = products.filter(p => p.default_cogs && p.default_cogs > 0);
-        } else if (filter === 'unmapped') {
-          filteredProducts = products.filter(p => !p.default_cogs || p.default_cogs == 0);
+        if (!data.products || data.products.length === 0) {
+          grid.innerHTML = '<div class="warning">⚠ No products found</div>';
+          return;
         }
 
-        // Render table
-        renderMasterCatalogTable(filteredProducts, tbody, tfoot);
+        grid.innerHTML = data.products.map(p => `
+          <div class="card" style="padding:12px;">
+            <img src="${p.imageUrl}"
+                 style="width:100%; border-radius:8px; margin-bottom:8px;"
+                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22300%22 height=%22300%22%3E%3Crect fill=%22%23333%22 width=%22300%22 height=%22300%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22%3ENo Image%3C/text%3E%3C/svg%3E'; console.error('Failed to load: ${p.imageUrl}');"
+                 loading="lazy" />
+            <div style="font-size:14px; font-weight:600; margin-bottom:4px;">${p.name}</div>
+            <div class="muted" style="font-size:12px; margin-bottom:8px;">${p.category} | ${p.sales} sales | $${p.revenue} revenue</div>
+            <div style="font-size:11px; color:#64748b; margin-bottom:8px;">Keywords: ${p.keywords.join(', ')}</div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="number" id="cogs-${p.id}" placeholder="COGS" step="0.01" min="0" style="flex:1; padding:6px;">
+              <button onclick="saveCOGS(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${JSON.stringify(p.keywords)})" style="padding:6px 12px; font-size:12px;">Save</button>
+            </div>
+          </div>
+        `).join('');
 
+        // Log first few image URLs for debugging
+        console.log('Sample image URLs:', data.products.slice(0, 3).map(p => p.imageUrl));
       } catch (error) {
-        tbody.innerHTML = `
-          <tr><td colspan="9" style="padding:20px; text-align:center;" class="danger">❌ Error loading catalog: ${error.message}</td></tr>
-        `;
+        grid.innerHTML = `<div class="danger">❌ Error: ${error.message}</div>`;
+        console.error('Failed to load catalog:', error);
       }
     }
 
-    function renderMasterCatalogTable(products, tbody, tfoot) {
-      if (products.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="muted">No products match the filter.</td></tr>';
+    async function saveCOGS(productId, productName, keywords) {
+      const cogsInput = document.getElementById(`cogs-${productId}`);
+      const cogs = parseFloat(cogsInput.value);
+
+      if (!cogs || cogs <= 0) {
+        alert('Please enter a valid COGS amount');
         return;
       }
 
-      // Sort by total revenue descending
-      const sorted = products.sort((a, b) => parseFloat(b.total_gross_sales || 0) - parseFloat(a.total_gross_sales || 0));
+      const res = await fetch(`${apiBase}/product-catalog/save-cogs`, {
+        method: 'POST',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: productId,
+          cogs: cogs,
+          keywords: keywords,
+          product_name: productName
+        })
+      });
 
-      let totalQty = 0;
-      let totalRevenue = 0;
-      let totalCOGS = 0;
-      let totalProfit = 0;
-
-      tbody.innerHTML = sorted.map(p => {
-        const timesSold = p.times_sold || 0;
-        const qty = p.total_quantity_sold || 0;
-        const avgPrice = p.avg_sale_price || 0;
-        const revenue = parseFloat(p.total_gross_sales || 0);
-
-        // For now, COGS is 0 until rules are applied
-        const cogsPerUnit = 0;
-        const totalCogs = 0;
-        const profit = 0;
-        const status = '⚠️ Needs COGS';
-
-        totalQty += qty;
-        totalRevenue += revenue;
-        totalCOGS += totalCogs;
-        totalProfit += profit;
-
-        return `
-          <tr style="border-bottom:1px solid #1f2937;">
-            <td style="padding:12px 8px;">
-              <div style="font-weight:500;">${p.product_name}</div>
-            </td>
-            <td style="padding:12px 8px; text-align:center;">${timesSold}</td>
-            <td style="padding:12px 8px; text-align:right;">${qty}</td>
-            <td style="padding:12px 8px; text-align:right;">$${avgPrice.toFixed(2)}</td>
-            <td style="padding:12px 8px; text-align:right; font-weight:600;">$${revenue.toFixed(2)}</td>
-            <td style="padding:12px 8px; text-align:right;" class="muted">-</td>
-            <td style="padding:12px 8px; text-align:right;" class="muted">-</td>
-            <td style="padding:12px 8px; text-align:right;" class="muted">-</td>
-            <td style="padding:12px 8px; text-align:center;">
-              <span class="warning" style="font-size:11px;">${status}</span>
-            </td>
-          </tr>
-        `;
-      }).join('');
-
-      // Footer totals
-      tfoot.innerHTML = `
-        <tr>
-          <td style="padding:12px 8px;"><strong>TOTALS (${products.length} products)</strong></td>
-          <td style="padding:12px 8px; text-align:center; font-weight:600;">-</td>
-          <td style="padding:12px 8px; text-align:right; font-weight:600;">${totalQty}</td>
-          <td style="padding:12px 8px;"></td>
-          <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${totalRevenue.toFixed(2)}</td>
-          <td style="padding:12px 8px; text-align:right;">-</td>
-          <td style="padding:12px 8px; text-align:right;">-</td>
-          <td style="padding:12px 8px; text-align:right;">-</td>
-          <td style="padding:12px 8px;"></td>
-        </tr>
-      `;
-    }
-
-    function filterMasterCatalog() {
-      const searchTerm = document.getElementById('catalogSearch').value.toLowerCase();
-      const tbody = document.getElementById('masterCatalogTableBody');
-      const tfoot = document.getElementById('masterCatalogTableFooter');
-
-      if (!searchTerm) {
-        loadMasterCatalog();
-        return;
+      const result = await res.json();
+      if (result.success) {
+        alert(`✓ COGS rule created for ${productName}`);
+        cogsInput.style.background = '#22c55e33';
+      } else {
+        alert('Error saving COGS');
       }
-
-      const filtered = allCatalogProducts.filter(p =>
-        p.product_name.toLowerCase().includes(searchTerm)
-      );
-
-      renderMasterCatalogTable(filtered, tbody, tfoot);
     }
 
     // Marketplace Import
