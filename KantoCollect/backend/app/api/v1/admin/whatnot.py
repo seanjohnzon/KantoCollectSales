@@ -4,6 +4,7 @@ WhatNot sales tracking endpoints.
 All endpoints require admin authentication.
 """
 
+from decimal import Decimal
 from pathlib import Path
 from typing import Optional, List
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
@@ -289,15 +290,28 @@ async def update_transaction(
     current_user: AdminUser,
     db: Session = Depends(get_whatnot_db),
 ) -> TransactionRead:
-    """Update transaction COGS manually."""
+    """Update transaction COGS manually (admin override)."""
     transaction = db.get(SalesTransaction, transaction_id)
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    # Update COGS if provided
+    # Update COGS if provided (total COGS, not per-unit)
     if payload.cogs is not None:
-        from app.services.whatnot.cogs_service import apply_cogs_to_transaction
-        apply_cogs_to_transaction(transaction, payload.cogs, rule_id=None)
+        transaction.cogs = payload.cogs
+        transaction.matched_cogs_rule_id = None  # Clear rule since this is manual
+
+        # Recalculate net profit and ROI
+        transaction.net_profit = transaction.net_earnings - payload.cogs
+
+        # Calculate ROI percentage
+        if payload.cogs > 0:
+            transaction.roi_percent = (transaction.net_profit / payload.cogs) * Decimal("100")
+        else:
+            transaction.roi_percent = None
+
+    # Update notes if provided
+    if payload.notes is not None:
+        transaction.notes = payload.notes
 
     db.add(transaction)
     db.commit()

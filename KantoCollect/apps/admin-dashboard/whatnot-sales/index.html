@@ -139,19 +139,65 @@
     <!-- COGS RULES TAB -->
     <div id="cogs-rules-tab" class="tab-content">
       <div class="card">
-        <div class="row" style="margin-bottom:16px;">
-          <h2 style="flex:1;">⭐ COGS Mapping Rules</h2>
-          <button onclick="openNewRuleModal()">+ New Rule</button>
+        <h2>⭐ COGS Mapping Rules</h2>
+        <p class="muted" style="margin-bottom:20px;">Create keyword-based rules to automatically assign COGS to products. Rules are checked by priority (higher numbers first).</p>
+
+        <!-- Add New Rule Form -->
+        <div style="background:#0f172a; padding:20px; border-radius:8px; border:1px solid #1f2937; margin-bottom:24px;">
+          <h3 style="margin:0 0 16px 0; font-size:16px;">➕ Add New Rule</h3>
+          <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:12px; margin-bottom:12px;">
+            <div>
+              <label>Rule Name</label>
+              <input id="newRuleName" type="text" placeholder="e.g., Booster Packs" style="width:100%;" />
+            </div>
+            <div>
+              <label>COGS Amount ($)</label>
+              <input id="newRuleCOGS" type="number" step="0.01" placeholder="0.00" style="width:100%;" />
+            </div>
+            <div>
+              <label>Priority</label>
+              <input id="newRulePriority" type="number" placeholder="100" value="100" style="width:100%;" />
+            </div>
+            <div>
+              <label>Match Type</label>
+              <select id="newRuleMatchType" style="width:100%;">
+                <option value="contains">Contains</option>
+                <option value="starts_with">Starts With</option>
+                <option value="ends_with">Ends With</option>
+                <option value="exact">Exact Match</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <label>Keywords (comma-separated)</label>
+            <input id="newRuleKeywords" type="text" placeholder="booster, booster pack, bp" style="width:100%;" />
+            <div class="muted" style="margin-top:4px;">Enter keywords separated by commas. Example: "booster pack, booster, bp"</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+            <div>
+              <label>Category (optional)</label>
+              <input id="newRuleCategory" type="text" placeholder="e.g., Sealed Products" style="width:100%;" />
+            </div>
+            <div>
+              <label>Notes (optional)</label>
+              <input id="newRuleNotes" type="text" placeholder="Description of this rule" style="width:100%;" />
+            </div>
+          </div>
+          <button onclick="createNewRule()">✅ Create Rule</button>
         </div>
+
+        <!-- Existing Rules List -->
+        <h3 style="margin:0 0 16px 0; font-size:16px;">📋 Existing Rules (<span id="rulesCount">0</span>)</h3>
         <div id="cogsRulesList"></div>
       </div>
     </div>
 
     <!-- SHOWS TAB -->
     <div id="shows-tab" class="tab-content">
-      <div class="card">
+      <!-- Shows List View -->
+      <div id="shows-list-view" class="card">
         <h2>🎬 WhatNot Stream Sales</h2>
-        <p class="muted" style="margin-bottom:16px;">Detailed overview of all stream sales and performance metrics</p>
+        <p class="muted" style="margin-bottom:16px;">Click on any show to view and edit transaction details</p>
 
         <!-- Summary Stats -->
         <div class="stat-grid" style="margin-bottom:24px;">
@@ -199,6 +245,62 @@
             <tfoot id="showsTableFooter" style="background:#1f2937; border-top:2px solid #22c55e; font-weight:600;">
               <!-- Totals row will be added here -->
             </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Show Detail View -->
+      <div id="show-detail-view" class="card" style="display:none;">
+        <div style="margin-bottom:20px;">
+          <button class="secondary" onclick="backToShowsList()">← Back to Shows</button>
+        </div>
+
+        <h2 id="showDetailTitle">Show Details</h2>
+        <div id="showDetailMeta" class="muted" style="margin-bottom:20px;"></div>
+
+        <!-- Show Summary Stats -->
+        <div class="stat-grid" style="margin-bottom:24px;">
+          <div class="stat-card">
+            <div class="stat-value" id="detailTotalItems">0</div>
+            <div class="stat-label">Items Sold</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="detailRevenue">$0</div>
+            <div class="stat-label">Total Revenue</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="detailCOGS">$0</div>
+            <div class="stat-label">Total COGS</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value" id="detailProfit">$0</div>
+            <div class="stat-label">Net Profit</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Transactions</h3>
+          <button onclick="saveAllCOGS()" id="saveCOGSBtn">💾 Save All COGS Changes</button>
+        </div>
+
+        <!-- Transactions Table -->
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#0f172a;">
+                <th style="padding:12px 8px;">Product</th>
+                <th style="padding:12px 8px; text-align:center;">Qty</th>
+                <th style="padding:12px 8px;">Buyer</th>
+                <th style="padding:12px 8px; text-align:right;">Price</th>
+                <th style="padding:12px 8px; text-align:right;">Earnings</th>
+                <th style="padding:12px 8px; text-align:right;">COGS</th>
+                <th style="padding:12px 8px; text-align:right;">Profit</th>
+                <th style="padding:12px 8px; text-align:right;">ROI%</th>
+              </tr>
+            </thead>
+            <tbody id="transactionsTableBody">
+              <!-- Populated by JavaScript -->
+            </tbody>
           </table>
         </div>
       </div>
@@ -276,8 +378,8 @@
       </div>
     </div>
 
-    <!-- COGS Rule Modal -->
-    <div id="cogsRuleModal" class="modal">
+    <!-- COGS Rule Modal (DEPRECATED - Using inline form now) -->
+    <div id="cogsRuleModal" class="modal" style="display:none;">
       <div class="modal-content">
         <div class="modal-header">
           <h2 id="ruleModalTitle">New COGS Rule</h2>
@@ -521,31 +623,169 @@
 
     // COGS Rules
     async function loadCogsRules() {
-      const res = await fetch(`${apiBase}/cogs-rules`, { headers: authHeaders() });
-      const rules = await res.json();
-      const container = document.getElementById("cogsRulesList");
+      try {
+        const res = await fetch(`${apiBase}/cogs-rules`, { headers: authHeaders() });
+        const rules = await res.json();
+        const container = document.getElementById("cogsRulesList");
+        const countEl = document.getElementById("rulesCount");
 
-      if (rules.length === 0) {
-        container.innerHTML = '<div class="muted">No COGS rules yet. Create one to auto-assign costs!</div>';
+        countEl.textContent = rules.length;
+
+        if (rules.length === 0) {
+          container.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">No COGS rules yet. Create one above to auto-assign costs!</div>';
+          return;
+        }
+
+        // Sort by priority (descending)
+        const sortedRules = rules.sort((a, b) => b.priority - a.priority);
+
+        container.innerHTML = sortedRules.map(rule => `
+          <div style="background:#0f172a; padding:16px; border-radius:8px; border:1px solid #1f2937; margin-bottom:12px;">
+            <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:12px; align-items:center;">
+              <div>
+                <strong style="font-size:15px;">${rule.rule_name}</strong>
+                <div class="muted" style="font-size:12px; margin-top:4px;">Keywords: ${rule.keywords.join(', ')}</div>
+                ${rule.category ? `<div class="muted" style="font-size:11px;">Category: ${rule.category}</div>` : ''}
+              </div>
+              <div style="text-align:center;">
+                <div class="muted" style="font-size:11px;">COGS</div>
+                <div style="font-weight:600; color:#22c55e; font-size:16px;">$${parseFloat(rule.cogs_amount).toFixed(2)}</div>
+              </div>
+              <div style="text-align:center;">
+                <div class="muted" style="font-size:11px;">Priority</div>
+                <div style="font-weight:600;">${rule.priority}</div>
+              </div>
+              <div style="text-align:center;">
+                <div class="muted" style="font-size:11px;">Match</div>
+                <div style="font-size:12px;">${rule.match_type}</div>
+              </div>
+              <div style="display:flex; gap:6px;">
+                ${rule.is_active ?
+                  '<button class="secondary" style="font-size:12px; padding:6px 10px;" onclick="toggleRuleStatus(' + rule.id + ', false)">🔇 Disable</button>' :
+                  '<button style="font-size:12px; padding:6px 10px;" onclick="toggleRuleStatus(' + rule.id + ', true)">🔊 Enable</button>'}
+                <button class="danger" style="font-size:12px; padding:6px 10px;" onclick="deleteCogsRule(${rule.id})">🗑️</button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error('Error loading COGS rules:', error);
+      }
+    }
+
+    async function createNewRule() {
+      const name = document.getElementById('newRuleName').value.trim();
+      const cogs = parseFloat(document.getElementById('newRuleCOGS').value);
+      const priority = parseInt(document.getElementById('newRulePriority').value) || 100;
+      const matchType = document.getElementById('newRuleMatchType').value;
+      const keywordsStr = document.getElementById('newRuleKeywords').value.trim();
+      const category = document.getElementById('newRuleCategory').value.trim();
+      const notes = document.getElementById('newRuleNotes').value.trim();
+
+      // Validation
+      if (!name) {
+        alert('Please enter a rule name');
+        return;
+      }
+      if (!cogs || cogs <= 0) {
+        alert('Please enter a valid COGS amount');
+        return;
+      }
+      if (!keywordsStr) {
+        alert('Please enter at least one keyword');
         return;
       }
 
-      container.innerHTML = rules.map(rule => `
-        <div class="card">
-          <div class="row" style="margin-bottom:8px;">
-            <strong style="flex:1;">${rule.rule_name}</strong>
-            <span class="muted">Priority: ${rule.priority}</span>
-            ${rule.is_active ? '<span class="success">✓ Active</span>' : '<span class="muted">Disabled</span>'}
-          </div>
-          <div class="muted">Keywords: ${rule.keywords.join(', ')}</div>
-          <div>COGS: <strong>$${rule.cogs_amount}</strong> | Match: ${rule.match_type}</div>
-          <div class="row" style="margin-top:12px;">
-            <button class="secondary" onclick="editRule(${rule.id})">Edit</button>
-            <button class="secondary" onclick="toggleRule(${rule.id})">${rule.is_active ? 'Disable' : 'Enable'}</button>
-            <button class="danger" onclick="deleteRule(${rule.id})">Delete</button>
-          </div>
-        </div>
-      `).join('');
+      // Parse keywords (comma-separated)
+      const keywords = keywordsStr.split(',').map(k => k.trim()).filter(k => k.length > 0);
+      if (keywords.length === 0) {
+        alert('Please enter at least one keyword');
+        return;
+      }
+
+      const data = {
+        rule_name: name,
+        keywords: keywords,
+        cogs_amount: cogs,
+        match_type: matchType,
+        priority: priority,
+        is_active: true,
+        category: category || null,
+        notes: notes || null
+      };
+
+      try {
+        const res = await fetch(`${apiBase}/cogs-rules`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+          // Clear form
+          document.getElementById('newRuleName').value = '';
+          document.getElementById('newRuleCOGS').value = '';
+          document.getElementById('newRulePriority').value = '100';
+          document.getElementById('newRuleKeywords').value = '';
+          document.getElementById('newRuleCategory').value = '';
+          document.getElementById('newRuleNotes').value = '';
+
+          // Reload rules list
+          await loadCogsRules();
+          alert('✅ COGS rule created successfully!');
+        } else {
+          const error = await res.json();
+          alert(`Error creating rule: ${error.detail || 'Unknown error'}`);
+        }
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    }
+
+    async function toggleRuleStatus(ruleId, newStatus) {
+      try {
+        const res = await fetch(`${apiBase}/cogs-rules/${ruleId}`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ is_active: newStatus })
+        });
+
+        if (res.ok) {
+          await loadCogsRules();
+        } else {
+          alert('Error updating rule status');
+        }
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
+    }
+
+    async function deleteCogsRule(ruleId) {
+      if (!confirm('Are you sure you want to delete this COGS rule?')) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${apiBase}/cogs-rules/${ruleId}`, {
+          method: 'DELETE',
+          headers: authHeaders()
+        });
+
+        if (res.ok || res.status === 204) {
+          await loadCogsRules();
+          alert('✅ Rule deleted successfully');
+        } else {
+          alert('Error deleting rule');
+        }
+      } catch (error) {
+        alert(`Error: ${error.message}`);
+      }
     }
 
     function openNewRuleModal() {
@@ -718,7 +958,10 @@
           const showName = show.show_name.length > 50 ? show.show_name.substring(0, 47) + '...' : show.show_name;
 
           return `
-            <tr style="border-bottom:1px solid #1f2937; transition:background 0.2s;" onmouseover="this.style.background='#111827'" onmouseout="this.style.background='transparent'">
+            <tr style="border-bottom:1px solid #1f2937; transition:background 0.2s; cursor:pointer;"
+                onclick="viewShowDetail(${show.id})"
+                onmouseover="this.style.background='#111827'"
+                onmouseout="this.style.background='transparent'">
               <td style="padding:12px 8px; white-space:nowrap;">${dateStr}</td>
               <td style="padding:12px 8px;">
                 <div style="font-weight:500;">${showName}</div>
@@ -765,6 +1008,164 @@
         document.getElementById("showsTableBody").innerHTML = `
           <tr><td colspan="11" style="padding:20px; text-align:center;" class="danger">❌ Error loading shows: ${error.message}</td></tr>
         `;
+      }
+    }
+
+    // Show Detail View Functions
+    let currentShowTransactions = [];
+
+    async function viewShowDetail(showId) {
+      try {
+        // Fetch show details
+        const showRes = await fetch(`${apiBase}/shows/${showId}`, { headers: authHeaders() });
+        const show = await showRes.json();
+
+        // Fetch transactions for this show
+        const transRes = await fetch(`${apiBase}/transactions?show_id=${showId}&limit=500`, { headers: authHeaders() });
+        const transactions = await transRes.json();
+        currentShowTransactions = transactions;
+
+        // Update header
+        const date = new Date(show.show_date);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        document.getElementById('showDetailTitle').textContent = `🎬 ${show.show_name}`;
+        document.getElementById('showDetailMeta').textContent = `${dateStr} • ${transactions.length} transactions`;
+
+        // Update summary stats
+        const revenue = parseFloat(show.total_gross_sales || 0);
+        const cogs = parseFloat(show.total_cogs || 0);
+        const profit = parseFloat(show.total_net_profit || 0);
+        document.getElementById('detailTotalItems').textContent = show.item_count || 0;
+        document.getElementById('detailRevenue').textContent = `$${revenue.toFixed(2)}`;
+        document.getElementById('detailCOGS').textContent = `$${cogs.toFixed(2)}`;
+        document.getElementById('detailProfit').textContent = `$${profit.toFixed(2)}`;
+
+        // Render transactions table
+        const tbody = document.getElementById('transactionsTableBody');
+        tbody.innerHTML = transactions.map((t, index) => {
+          const revenue = parseFloat(t.total_revenue || t.gross_sale_price || 0);
+          const earnings = parseFloat(t.net_earnings || 0);
+          const cogs = parseFloat(t.cogs || 0);
+          const profit = earnings - cogs;
+          const roi = cogs > 0 ? ((profit / cogs) * 100).toFixed(1) : 'N/A';
+
+          const profitColor = profit > 0 ? '#22c55e' : profit < 0 ? '#ef4444' : '#94a3b8';
+          const roiColor = roi !== 'N/A' ? (parseFloat(roi) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
+
+          return `
+            <tr style="border-bottom:1px solid #1f2937;">
+              <td style="padding:12px 8px;">
+                <div style="font-weight:500; max-width:300px;">${t.item_name}</div>
+              </td>
+              <td style="padding:12px 8px; text-align:center;">${t.quantity || 1}</td>
+              <td style="padding:12px 8px;">@${t.buyer_username}</td>
+              <td style="padding:12px 8px; text-align:right;">$${revenue.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right; color:#22c55e;">$${earnings.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right;">
+                <input type="number"
+                       step="0.01"
+                       value="${cogs.toFixed(2)}"
+                       data-transaction-id="${t.id}"
+                       data-index="${index}"
+                       onchange="updateTransactionCalc(${index})"
+                       style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px;" />
+              </td>
+              <td id="profit-${index}" style="padding:12px 8px; text-align:right; font-weight:600; color:${profitColor};">$${profit.toFixed(2)}</td>
+              <td id="roi-${index}" style="padding:12px 8px; text-align:right; font-weight:600; color:${roiColor};">${roi}${roi !== 'N/A' ? '%' : ''}</td>
+            </tr>
+          `;
+        }).join('');
+
+        // Hide shows list, show detail view
+        document.getElementById('shows-list-view').style.display = 'none';
+        document.getElementById('show-detail-view').style.display = 'block';
+
+      } catch (error) {
+        alert(`Error loading show details: ${error.message}`);
+      }
+    }
+
+    function backToShowsList() {
+      document.getElementById('show-detail-view').style.display = 'none';
+      document.getElementById('shows-list-view').style.display = 'block';
+      loadShows(); // Refresh the shows list
+    }
+
+    function updateTransactionCalc(index) {
+      const t = currentShowTransactions[index];
+      const cogsInput = document.querySelector(`input[data-index="${index}"]`);
+      const newCOGS = parseFloat(cogsInput.value) || 0;
+
+      const earnings = parseFloat(t.net_earnings || 0);
+      const profit = earnings - newCOGS;
+      const roi = newCOGS > 0 ? ((profit / newCOGS) * 100).toFixed(1) : 'N/A';
+
+      const profitColor = profit > 0 ? '#22c55e' : profit < 0 ? '#ef4444' : '#94a3b8';
+      const roiColor = roi !== 'N/A' ? (parseFloat(roi) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
+
+      document.getElementById(`profit-${index}`).textContent = `$${profit.toFixed(2)}`;
+      document.getElementById(`profit-${index}`).style.color = profitColor;
+      document.getElementById(`roi-${index}`).textContent = `${roi}${roi !== 'N/A' ? '%' : ''}`;
+      document.getElementById(`roi-${index}`).style.color = roiColor;
+    }
+
+    async function saveAllCOGS() {
+      const saveBtn = document.getElementById('saveCOGSBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = '💾 Saving...';
+
+      try {
+        const updates = [];
+        const inputs = document.querySelectorAll('input[data-transaction-id]');
+
+        for (const input of inputs) {
+          const transactionId = parseInt(input.getAttribute('data-transaction-id'));
+          const newCOGS = parseFloat(input.value) || 0;
+          const index = parseInt(input.getAttribute('data-index'));
+          const t = currentShowTransactions[index];
+          const oldCOGS = parseFloat(t.cogs || 0);
+
+          // Only update if changed
+          if (Math.abs(newCOGS - oldCOGS) > 0.001) {
+            updates.push({ id: transactionId, cogs: newCOGS });
+          }
+        }
+
+        if (updates.length === 0) {
+          alert('No changes to save');
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 Save All COGS Changes';
+          return;
+        }
+
+        // Update each transaction
+        let successCount = 0;
+        for (const update of updates) {
+          const res = await fetch(`${apiBase}/transactions/${update.id}`, {
+            method: 'PUT',
+            headers: {
+              ...authHeaders(),
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ cogs: update.cogs })
+          });
+
+          if (res.ok) {
+            successCount++;
+          }
+        }
+
+        alert(`✅ Updated ${successCount} of ${updates.length} transactions`);
+
+        // Reload the show detail to refresh totals
+        const showId = currentShowTransactions[0].show_id;
+        viewShowDetail(showId);
+
+      } catch (error) {
+        alert(`Error saving COGS: ${error.message}`);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 Save All COGS Changes';
       }
     }
 
