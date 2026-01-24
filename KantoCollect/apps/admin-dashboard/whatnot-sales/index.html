@@ -1532,71 +1532,111 @@
           const expandIcon = isExpanded ? '▼' : '▶';
 
           // Main row
-          rows.push(`
-            <tr style="border-bottom:1px solid #1f2937; cursor:${count > 1 ? 'pointer' : 'default'}; transition:background 0.2s;"
-                ${count > 1 ? `onclick="toggleMarketplaceExpand('${productName.replace(/'/g, "\\'")}', this)"` : ''}
-                onmouseover="this.style.background='${count > 1 ? '#111827' : 'transparent'}'"
-                onmouseout="this.style.background='transparent'">
-              <td style="padding:12px 8px; text-align:center; color:#94a3b8;">
-                ${count > 1 ? expandIcon : ''}
-              </td>
-              <td style="padding:12px 8px;">
-                <div style="font-weight:500;">${productName}</div>
-                ${count > 1 ? `<div class="muted" style="font-size:11px; margin-top:2px;">${count} orders</div>` : ''}
-              </td>
-              <td style="padding:12px 8px; text-align:center; font-weight:600;">${count}</td>
-              <td style="padding:12px 8px; text-align:right;">$${avgPrice.toFixed(2)}</td>
-              <td style="padding:12px 8px; text-align:right; font-weight:600;">$${revenue.toFixed(2)}</td>
-              <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${earnings.toFixed(2)}</td>
-              <td style="padding:12px 8px; text-align:right;" class="muted">${cogs > 0 ? `$${avgCOGS.toFixed(2)}` : '-'}</td>
-              <td style="padding:12px 8px; text-align:right; font-weight:600; color:${profitColor};">$${profit.toFixed(2)}</td>
-              <td style="padding:12px 8px; text-align:right; font-weight:600; color:${roiColor};">${avgROI}${avgROI !== 'N/A' ? '%' : ''}</td>
-            </tr>
-          `);
+          // For single items (count == 1), show editable COGS in the main row
+          if (count === 1) {
+            const singleOrder = items[0];
+            const currentOrderIndex = orderIndex;
+            orderIndex++;
 
-          // Expanded detail rows (if expanded and count > 1)
-          if (isExpanded && count > 1) {
-            items.forEach((order, i) => {
-              const currentOrderIndex = orderIndex;
-              orderIndex++;
+            const singleCOGS = parseFloat(singleOrder.cogs || 0);
+            const singleProfit = earnings - singleCOGS;
+            const singleROI = singleCOGS > 0 ? ((singleProfit / singleCOGS) * 100).toFixed(1) : 'N/A';
+            const singleProfitColor = singleProfit > 0 ? '#22c55e' : singleProfit < 0 ? '#ef4444' : '#94a3b8';
+            const singleROIColor = singleROI !== 'N/A' ? (parseFloat(singleROI) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
 
-              const orderRevenue = parseFloat(order.total_revenue || order.gross_sale_price || 0);
-              const orderEarnings = parseFloat(order.net_earnings || 0);
-              const orderCOGS = parseFloat(order.cogs || 0);
-              const orderProfit = orderEarnings - orderCOGS;
-              const orderROI = orderCOGS > 0 ? ((orderProfit / orderCOGS) * 100).toFixed(1) : 'N/A';
-              const orderProfitColor = orderProfit > 0 ? '#22c55e' : orderProfit < 0 ? '#ef4444' : '#94a3b8';
-              const orderROIColor = orderROI !== 'N/A' ? (parseFloat(orderROI) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
-
-              const date = new Date(order.transaction_date);
-              const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-              rows.push(`
-                <tr class="marketplace-detail-row" style="background:#0f172a; border-bottom:1px solid #1f2937;">
-                  <td style="padding:8px 8px 8px 32px;"></td>
-                  <td style="padding:8px;" colspan="2">
-                    <div style="font-size:12px;" class="muted">${dateStr} • @${order.buyer_username || 'Unknown'}</div>
-                  </td>
-                  <td style="padding:8px; text-align:right; font-size:12px;">$${orderRevenue.toFixed(2)}</td>
-                  <td style="padding:8px; text-align:right; font-size:12px;">-</td>
-                  <td style="padding:8px; text-align:right; font-size:12px; color:#22c55e;">$${orderEarnings.toFixed(2)}</td>
-                  <td style="padding:8px; text-align:right;">
-                    <input type="number"
-                           step="0.01"
-                           value="${orderCOGS.toFixed(2)}"
-                           data-transaction-id="${order.id}"
-                           data-marketplace-index="${currentOrderIndex}"
-                           onchange="updateMarketplaceCalc(${currentOrderIndex})"
-                           style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;" />
-                  </td>
-                  <td id="marketplace-profit-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderProfitColor};">$${orderProfit.toFixed(2)}</td>
-                  <td id="marketplace-roi-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderROIColor};">${orderROI}${orderROI !== 'N/A' ? '%' : ''}</td>
-                </tr>
-              `);
-            });
+            rows.push(`
+              <tr style="border-bottom:1px solid #1f2937; transition:background 0.2s;">
+                <td style="padding:12px 8px; text-align:center; color:#94a3b8;"></td>
+                <td style="padding:12px 8px;">
+                  <div style="font-weight:500;">${productName}</div>
+                </td>
+                <td style="padding:12px 8px; text-align:center; font-weight:600;">${count}</td>
+                <td style="padding:12px 8px; text-align:right;">$${avgPrice.toFixed(2)}</td>
+                <td style="padding:12px 8px; text-align:right; font-weight:600;">$${revenue.toFixed(2)}</td>
+                <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${earnings.toFixed(2)}</td>
+                <td style="padding:12px 8px; text-align:right;">
+                  <input type="number"
+                         step="0.01"
+                         value="${singleCOGS.toFixed(2)}"
+                         data-transaction-id="${singleOrder.id}"
+                         data-marketplace-index="${currentOrderIndex}"
+                         onchange="updateMarketplaceCalc(${currentOrderIndex})"
+                         style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
+                </td>
+                <td id="marketplace-profit-${currentOrderIndex}" style="padding:12px 8px; text-align:right; font-weight:600; color:${singleProfitColor};">$${singleProfit.toFixed(2)}</td>
+                <td id="marketplace-roi-${currentOrderIndex}" style="padding:12px 8px; text-align:right; font-weight:600; color:${singleROIColor};">${singleROI}${singleROI !== 'N/A' ? '%' : ''}</td>
+              </tr>
+            `);
           } else {
-            // Still increment orderIndex for items in collapsed groups
-            orderIndex += items.length;
+            // Multiple items - show grouped row (clickable to expand)
+            rows.push(`
+              <tr style="border-bottom:1px solid #1f2937; cursor:pointer; transition:background 0.2s;"
+                  onclick="toggleMarketplaceExpand('${productName.replace(/'/g, "\\'")}', this)"
+                  onmouseover="this.style.background='#111827'"
+                  onmouseout="this.style.background='transparent'">
+                <td style="padding:12px 8px; text-align:center; color:#94a3b8;">
+                  ${expandIcon}
+                </td>
+                <td style="padding:12px 8px;">
+                  <div style="font-weight:500;">${productName}</div>
+                  <div class="muted" style="font-size:11px; margin-top:2px;">${count} orders</div>
+                </td>
+                <td style="padding:12px 8px; text-align:center; font-weight:600;">${count}</td>
+                <td style="padding:12px 8px; text-align:right;">$${avgPrice.toFixed(2)}</td>
+                <td style="padding:12px 8px; text-align:right; font-weight:600;">$${revenue.toFixed(2)}</td>
+                <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${earnings.toFixed(2)}</td>
+                <td style="padding:12px 8px; text-align:right;" class="muted">${cogs > 0 ? `$${avgCOGS.toFixed(2)}` : '-'}</td>
+                <td style="padding:12px 8px; text-align:right; font-weight:600; color:${profitColor};">$${profit.toFixed(2)}</td>
+                <td style="padding:12px 8px; text-align:right; font-weight:600; color:${roiColor};">${avgROI}${avgROI !== 'N/A' ? '%' : ''}</td>
+              </tr>
+            `);
+          }
+
+          // Expanded detail rows (only for count > 1)
+          if (count > 1) {
+            if (isExpanded) {
+              items.forEach((order, i) => {
+                const currentOrderIndex = orderIndex;
+                orderIndex++;
+
+                const orderRevenue = parseFloat(order.total_revenue || order.gross_sale_price || 0);
+                const orderEarnings = parseFloat(order.net_earnings || 0);
+                const orderCOGS = parseFloat(order.cogs || 0);
+                const orderProfit = orderEarnings - orderCOGS;
+                const orderROI = orderCOGS > 0 ? ((orderProfit / orderCOGS) * 100).toFixed(1) : 'N/A';
+                const orderProfitColor = orderProfit > 0 ? '#22c55e' : orderProfit < 0 ? '#ef4444' : '#94a3b8';
+                const orderROIColor = orderROI !== 'N/A' ? (parseFloat(orderROI) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
+
+                const date = new Date(order.transaction_date);
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                rows.push(`
+                  <tr class="marketplace-detail-row" style="background:#0f172a; border-bottom:1px solid #1f2937;">
+                    <td style="padding:8px 8px 8px 32px;"></td>
+                    <td style="padding:8px;" colspan="2">
+                      <div style="font-size:12px;" class="muted">${dateStr} • @${order.buyer_username || 'Unknown'}</div>
+                    </td>
+                    <td style="padding:8px; text-align:right; font-size:12px;">$${orderRevenue.toFixed(2)}</td>
+                    <td style="padding:8px; text-align:right; font-size:12px;">-</td>
+                    <td style="padding:8px; text-align:right; font-size:12px; color:#22c55e;">$${orderEarnings.toFixed(2)}</td>
+                    <td style="padding:8px; text-align:right;">
+                      <input type="number"
+                             step="0.01"
+                             value="${orderCOGS.toFixed(2)}"
+                             data-transaction-id="${order.id}"
+                             data-marketplace-index="${currentOrderIndex}"
+                             onchange="updateMarketplaceCalc(${currentOrderIndex})"
+                             style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;" />
+                    </td>
+                    <td id="marketplace-profit-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderProfitColor};">$${orderProfit.toFixed(2)}</td>
+                    <td id="marketplace-roi-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderROIColor};">${orderROI}${orderROI !== 'N/A' ? '%' : ''}</td>
+                  </tr>
+                `);
+              });
+            } else {
+              // Still increment orderIndex for items in collapsed groups
+              orderIndex += items.length;
+            }
           }
         });
 
