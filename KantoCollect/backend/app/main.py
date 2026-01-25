@@ -92,6 +92,22 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@app.get("/debug/paths")
+async def debug_paths():
+    """Debug endpoint to check file paths."""
+    import os
+    html_file = STATIC_DIR / "whatnot-sales" / "index.html"
+    return {
+        "static_dir": str(STATIC_DIR),
+        "static_dir_exists": STATIC_DIR.exists(),
+        "whatnot_html": str(html_file),
+        "whatnot_html_exists": html_file.exists(),
+        "cwd": os.getcwd(),
+        "file_location": str(Path(__file__)),
+        "static_dir_contents": os.listdir(str(STATIC_DIR)) if STATIC_DIR.exists() else "DIR NOT FOUND",
+    }
+
+
 # Admin Dashboard Routes
 @app.get("/deal-analyzer")
 async def deal_analyzer_ui():
