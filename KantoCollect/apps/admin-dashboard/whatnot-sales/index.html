@@ -30,7 +30,7 @@
     .danger { color: #ef4444; }
 
     /* Tabs */
-    .tabs { display: none; gap: 8px; border-bottom: 1px solid #1f2937; margin-bottom: 24px; }
+    .tabs { display: flex; gap: 8px; border-bottom: 1px solid #1f2937; margin-bottom: 24px; }
     .tab { padding: 12px 20px; cursor: pointer; color: #94a3b8; border-radius: 8px 8px 0 0; transition: all 0.2s; }
     .tab:hover { background: #111827; }
     .tab.active { background: #111827; color: #e2e8f0; border-bottom: 2px solid #22c55e; }
@@ -94,24 +94,24 @@
         <input id="adminPin" type="password" placeholder="Enter PIN" style="width:150px;" maxlength="4" />
         <button onclick="enableAdmin()" id="enableBtn">Enable Admin</button>
         <button class="secondary" onclick="disableAdmin()" id="disableBtn" style="display:none;">Disable Admin</button>
-        <span id="adminStatus" class="muted">🔒 Locked</span>
+        <span id="adminStatus" class="muted">👁️ View Only Mode (Enable admin to make edits)</span>
       </div>
     </div>
 
     <!-- Tabs -->
     <div class="tabs">
-      <div class="tab active" onclick="showTab('import')">📤 Import</div>
-      <div class="tab" onclick="showTab('master-catalog')">📋 Master Catalog</div>
-      <div class="tab" onclick="showTab('cogs-rules')">⭐ COGS Rules</div>
+      <div class="tab" onclick="showTab('import')" id="import-tab-btn" style="display:none;">📤 Import</div>
+      <div class="tab" onclick="showTab('master-catalog')" id="catalog-tab-btn">📋 Master Catalog</div>
+      <div class="tab" onclick="showTab('cogs-rules')" id="cogs-rules-tab-btn" style="display:none;">⭐ COGS Rules</div>
+      <div class="tab active" onclick="showTab('analytics')">📊 Analytics</div>
       <div class="tab" onclick="showTab('shows')">🎬 Shows</div>
       <div class="tab" onclick="showTab('marketplace')">🛒 Marketplace</div>
       <div class="tab" onclick="showTab('products')">📦 Products</div>
       <div class="tab" onclick="showTab('buyers')">👥 Buyers</div>
-      <div class="tab" onclick="showTab('analytics')">📊 Analytics</div>
     </div>
 
     <!-- IMPORT TAB -->
-    <div id="import-tab" class="tab-content active">
+    <div id="import-tab" class="tab-content">
       <div class="card">
         <h2>📤 Import Excel File</h2>
         <p class="muted">Upload your WhatNot sales Excel file. Show name and date will be automatically extracted.</p>
@@ -168,7 +168,7 @@
                 <th style="padding:12px 8px; font-weight:600;">Category</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:center;">Sales</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">Revenue</th>
-                <th style="padding:12px 8px; font-weight:600;">Keywords</th>
+                <th id="keywords-header" style="padding:12px 8px; font-weight:600; display:none;">Keywords</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">COGS ($)</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:center; width:80px;">Actions</th>
               </tr>
@@ -452,7 +452,7 @@
     </div>
 
     <!-- ANALYTICS TAB -->
-    <div id="analytics-tab" class="tab-content">
+    <div id="analytics-tab" class="tab-content active">
       <div id="analyticsStats" class="stat-grid"></div>
       <div class="grid">
         <div class="card">
@@ -464,7 +464,7 @@
           <div id="topBuyers"></div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="cogs-rule-performance-card" style="display:none;">
         <h2>⭐ COGS Rule Performance</h2>
         <div id="rulePerformance"></div>
       </div>
@@ -533,8 +533,8 @@
         document.getElementById("enableBtn").style.display = 'none';
         document.getElementById("disableBtn").style.display = 'inline-block';
         document.getElementById("adminPin").value = '';
-        document.querySelector('.tabs').style.display = 'flex';
         updateUIForAdminMode();
+        // Switch to catalog tab for convenience when admin is enabled
         showTab('master-catalog');
       } else {
         alert('Invalid PIN');
@@ -552,36 +552,88 @@
     }
 
     function updateUIForAdminMode() {
-      // Hide/show admin-only tabs
-      const importTab = document.querySelector('.tab[onclick*="import"]');
-      const rulesTab = document.querySelector('.tab[onclick*="cogs-rules"]');
-      const catalogTab = document.querySelector('.tab[onclick*="master-catalog"]');
+      // Show/hide admin-only tabs
+      const importTabBtn = document.getElementById('import-tab-btn');
+      const catalogTabBtn = document.getElementById('catalog-tab-btn');
+      const cogsRulesTabBtn = document.getElementById('cogs-rules-tab-btn');
 
-      importTab.style.display = adminEnabled ? 'block' : 'none';
-      rulesTab.style.display = adminEnabled ? 'block' : 'none';
-      catalogTab.style.display = adminEnabled ? 'block' : 'none';
+      if (importTabBtn) importTabBtn.style.display = adminEnabled ? 'block' : 'none';  // Import tab only for admins
+      if (catalogTabBtn) catalogTabBtn.style.display = adminEnabled ? 'block' : 'block'; // Catalog visible to all for viewing
+      if (cogsRulesTabBtn) cogsRulesTabBtn.style.display = adminEnabled ? 'block' : 'none'; // COGS Rules only for admins
 
-      // If disabling admin and currently on an admin-only tab, switch to Shows
-      if (!adminEnabled) {
-        const activeTab = document.querySelector('.tab.active');
-        if (activeTab && (activeTab.textContent.includes('Import') ||
-                          activeTab.textContent.includes('COGS Rules') ||
-                          activeTab.textContent.includes('Master Catalog'))) {
-          showTab('shows');
-        }
-      }
+      // Show/hide COGS Rule Performance card in Analytics tab
+      const cogsRulePerformanceCard = document.getElementById('cogs-rule-performance-card');
+      if (cogsRulePerformanceCard) cogsRulePerformanceCard.style.display = adminEnabled ? 'block' : 'none';
 
-      // Hide/show all Save buttons and input fields
-      document.querySelectorAll('input[type="number"]').forEach(input => {
+      // Show/hide Keywords column in Master Catalog
+      const keywordsHeader = document.getElementById('keywords-header');
+      if (keywordsHeader) keywordsHeader.style.display = adminEnabled ? 'table-cell' : 'none';
+
+      // Hide/show all edit buttons and input fields
+      // HIDE (not disable) all text/number inputs for non-admins
+      document.querySelectorAll('input[type="number"], input[type="text"], textarea, select').forEach(input => {
+        // Always keep these visible (admin PIN, search/filter dropdowns)
+        if (input.id === 'adminPin') return;
+        if (input.id && (input.id.includes('Search') || input.id.includes('Filter'))) return;
+        if (input.id && input.id.toLowerCase().includes('search')) return;
+        if (input.id && input.id.toLowerCase().includes('filter')) return;
+        if (input.placeholder && input.placeholder.toLowerCase().includes('search')) return;
+
+        // Hide inputs for non-admins, show for admins
+        input.style.display = adminEnabled ? '' : 'none';
         input.disabled = !adminEnabled;
-        input.style.opacity = adminEnabled ? '1' : '0.5';
       });
 
+      // Hide/show all buttons except view-only buttons
       document.querySelectorAll('button').forEach(btn => {
-        if (btn.textContent.includes('Save') || btn.textContent.includes('Upload') || btn.textContent.includes('New Rule')) {
+        // Skip admin enable/disable buttons
+        if (btn.id === 'enableBtn' || btn.id === 'disableBtn') return;
+
+        // Hide buttons that modify data (create, save, upload, delete, edit, apply, add, update, remove, import)
+        const text = btn.textContent.toLowerCase();
+        const isEditButton = text.includes('save') || text.includes('upload') ||
+                            text.includes('create') || text.includes('add') ||
+                            text.includes('delete') || text.includes('remove') ||
+                            text.includes('apply') || text.includes('import') ||
+                            text.includes('edit') || text.includes('update') ||
+                            text.includes('✅') || text.includes('➕') ||
+                            text.includes('✓') || text.includes('✕') ||
+                            btn.className.includes('danger');
+
+        if (isEditButton) {
           btn.style.display = adminEnabled ? 'inline-block' : 'none';
         }
       });
+
+      // Hide file upload inputs
+      document.querySelectorAll('input[type="file"]').forEach(input => {
+        input.style.display = adminEnabled ? 'block' : 'none';
+        // Add "Read Only Mode" message if hidden
+        if (!adminEnabled && !input.nextElementSibling?.classList.contains('read-only-notice')) {
+          const notice = document.createElement('div');
+          notice.className = 'read-only-notice muted';
+          notice.style.padding = '12px';
+          notice.style.background = '#1f2937';
+          notice.style.borderRadius = '8px';
+          notice.style.marginTop = '8px';
+          notice.innerHTML = '🔒 Read-only mode. Enable admin access to import data.';
+          input.parentNode.insertBefore(notice, input.nextSibling);
+        } else if (adminEnabled) {
+          // Remove read-only notices when admin enabled
+          input.parentNode.querySelectorAll('.read-only-notice').forEach(n => n.remove());
+        }
+      });
+
+      // Reload current tab to update button visibility
+      const activeTab = document.querySelector('.tab.active');
+      if (activeTab) {
+        const tabName = activeTab.getAttribute('onclick').match(/showTab\('([^']+)'\)/)[1];
+        if (tabName === 'master-catalog') loadMasterCatalog();
+        else if (tabName === 'cogs-rules') loadCOGSRules();
+        else if (tabName === 'marketplace') loadMarketplace();
+        else if (tabName === 'products') loadProducts();
+        else if (tabName === 'analytics') loadAnalytics();
+      }
     }
 
     function authHeaders() {
@@ -1154,13 +1206,17 @@
               <td style="padding:12px 8px; text-align:right;">$${revenue.toFixed(2)}</td>
               <td style="padding:12px 8px; text-align:right; color:#22c55e;">$${earnings.toFixed(2)}</td>
               <td style="padding:12px 8px; text-align:right;">
-                <input type="number"
-                       step="0.01"
-                       value="${cogs.toFixed(2)}"
-                       data-transaction-id="${t.id}"
-                       data-index="${index}"
-                       onchange="updateTransactionCalc(${index})"
-                       style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px;" />
+                ${adminEnabled ? `
+                  <input type="number"
+                         step="0.01"
+                         value="${cogs.toFixed(2)}"
+                         data-transaction-id="${t.id}"
+                         data-index="${index}"
+                         onchange="updateTransactionCalc(${index})"
+                         style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px;" />
+                ` : `
+                  <div>${cogs > 0 ? '$' + cogs.toFixed(2) : '-'}</div>
+                `}
               </td>
               <td id="profit-${index}" style="padding:12px 8px; text-align:right; font-weight:600; color:${profitColor};">$${profit.toFixed(2)}</td>
               <td id="roi-${index}" style="padding:12px 8px; text-align:right; font-weight:600; color:${roiColor};">${roi}${roi !== 'N/A' ? '%' : ''}</td>
@@ -1607,12 +1663,14 @@
               <td style="padding:12px 8px;">
                 <div id="name-display-${p.id}" style="display:flex; align-items:center; gap:8px;">
                   <div style="font-weight:500;">${p.name}</div>
-                  <button onclick="editProductName(${p.id})"
-                          id="edit-name-btn-${p.id}"
-                          style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; white-space:nowrap;"
-                          title="Rename product">
-                    ✏️
-                  </button>
+                  ${adminEnabled ? `
+                    <button onclick="editProductName(${p.id})"
+                            id="edit-name-btn-${p.id}"
+                            style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; white-space:nowrap;"
+                            title="Rename product">
+                      ✏️
+                    </button>
+                  ` : ''}
                 </div>
                 <div id="name-edit-${p.id}" style="display:none;">
                   <input type="text"
@@ -1636,12 +1694,14 @@
               <td style="padding:12px 8px;">
                 <div id="category-display-${p.id}" style="display:flex; align-items:center; gap:8px;">
                   <div class="muted" style="font-size:12px;">${p.category}</div>
-                  <button onclick="editCategory(${p.id})"
-                          id="edit-category-btn-${p.id}"
-                          style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; white-space:nowrap;"
-                          title="Edit category">
-                    ✏️
-                  </button>
+                  ${adminEnabled ? `
+                    <button onclick="editCategory(${p.id})"
+                            id="edit-category-btn-${p.id}"
+                            style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; white-space:nowrap;"
+                            title="Edit category">
+                      ✏️
+                    </button>
+                  ` : ''}
                 </div>
                 <div id="category-edit-${p.id}" style="display:none;">
                   <input type="text"
@@ -1672,7 +1732,8 @@
               <td style="padding:12px 8px; text-align:right; font-weight:600;">
                 $${p.revenue}
               </td>
-              <td style="padding:12px 8px;">
+              ${adminEnabled ? `
+              <td class="keywords-column" style="padding:12px 8px;">
                 <div id="keywords-display-${p.id}" style="display:flex; align-items:center; gap:8px;">
                   <div style="font-size:11px; color:#64748b; max-width:250px; overflow:hidden; text-overflow:ellipsis;">
                     <div style="margin-bottom:4px;">
@@ -1734,32 +1795,41 @@
                   </div>
                 </div>
               </td>
+              ` : ''}
               <td style="padding:12px 8px;">
-                <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
-                  <input type="number"
-                         step="0.01"
-                         min="0"
-                         value=""
-                         placeholder="0.00"
-                         id="cogs-input-${p.id}"
-                         data-product-id="${p.id}"
-                         data-product-name="${p.name.replace(/"/g, '&quot;')}"
-                         data-keywords='${JSON.stringify(p.keywords)}'
-                         style="width:80px; text-align:right; padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
-                  <button onclick="applyCatalogCOGS(${p.id})"
-                          id="apply-cogs-btn-${p.id}"
-                          style="padding:6px 12px; background:#22c55e; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; white-space:nowrap;"
-                          title="Apply COGS to all ${p.sales} transactions">
-                    Apply COGS
-                  </button>
-                </div>
+                ${adminEnabled ? `
+                  <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                    <input type="number"
+                           step="0.01"
+                           min="0"
+                           value=""
+                           placeholder="0.00"
+                           id="cogs-input-${p.id}"
+                           data-product-id="${p.id}"
+                           data-product-name="${p.name.replace(/"/g, '&quot;')}"
+                           data-keywords='${JSON.stringify(p.keywords)}'
+                           style="width:80px; text-align:right; padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
+                    <button onclick="applyCatalogCOGS(${p.id})"
+                            id="apply-cogs-btn-${p.id}"
+                            style="padding:6px 12px; background:#22c55e; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; white-space:nowrap;"
+                            title="Apply COGS to all ${p.sales} transactions">
+                      Apply COGS
+                    </button>
+                  </div>
+                ` : `
+                  <div class="muted" style="text-align:right; font-size:12px;">Read-only</div>
+                `}
               </td>
               <td style="padding:12px 8px; text-align:center;">
-                <button onclick="deleteCatalogItem(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
-                        style="padding:6px 12px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
-                        title="Delete ${p.name}">
-                  🗑️
-                </button>
+                ${adminEnabled ? `
+                  <button onclick="deleteCatalogItem(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
+                          style="padding:6px 12px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
+                          title="Delete ${p.name}">
+                    🗑️
+                  </button>
+                ` : `
+                  <div class="muted" style="font-size:12px;">-</div>
+                `}
               </td>
             </tr>
           `);
@@ -1781,7 +1851,7 @@
                           <th style="padding:8px; text-align:left; color:#94a3b8;">Item Name</th>
                           <th style="padding:8px; text-align:left; color:#94a3b8;">Show</th>
                           <th style="padding:8px; text-align:right; color:#94a3b8;">Price</th>
-                          <th style="padding:8px; text-align:left; color:#94a3b8;">Matched Keyword</th>
+                          ${adminEnabled ? '<th style="padding:8px; text-align:left; color:#94a3b8;">Matched Keyword</th>' : ''}
                           <th style="padding:8px; text-align:center; color:#94a3b8;">Actions</th>
                         </tr>
                       </thead>
@@ -1795,7 +1865,7 @@
                               <td style="padding:8px;">${m.item_name}</td>
                               <td style="padding:8px; color:#64748b;">${m.sale_type === 'marketplace' ? 'Marketplace' : (m.show_name || 'Show #' + m.show_id)}</td>
                               <td style="padding:8px; text-align:right; color:#22c55e;">$${m.gross_sale_price}</td>
-                              <td style="padding:8px; font-size:11px; color:#f59e0b;">"${matchedKeyword}"</td>
+                              ${adminEnabled ? `<td style="padding:8px; font-size:11px; color:#f59e0b;">"${matchedKeyword}"</td>` : ''}
                               <td style="padding:8px; text-align:center;">
                                 ${m.sale_type === 'marketplace'
                                   ? `<button onclick="navigateToMarketplace(${m.id})"
@@ -2629,13 +2699,17 @@
                 <td style="padding:12px 8px; text-align:right; font-weight:600;">$${revenue.toFixed(2)}</td>
                 <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">$${earnings.toFixed(2)}</td>
                 <td style="padding:12px 8px; text-align:right;">
-                  <input type="number"
-                         step="0.01"
-                         value="${singleCOGS.toFixed(2)}"
-                         data-transaction-id="${singleOrder.id}"
-                         data-marketplace-index="${currentOrderIndex}"
-                         onchange="updateMarketplaceCalc(${currentOrderIndex})"
-                         style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
+                  ${adminEnabled ? `
+                    <input type="number"
+                           step="0.01"
+                           value="${singleCOGS.toFixed(2)}"
+                           data-transaction-id="${singleOrder.id}"
+                           data-marketplace-index="${currentOrderIndex}"
+                           onchange="updateMarketplaceCalc(${currentOrderIndex})"
+                           style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
+                  ` : `
+                    <div style="font-size:13px;">${singleCOGS > 0 ? '$' + singleCOGS.toFixed(2) : '-'}</div>
+                  `}
                 </td>
                 <td id="marketplace-profit-${currentOrderIndex}" style="padding:12px 8px; text-align:right; font-weight:600; color:${singleProfitColor};">$${singleProfit.toFixed(2)}</td>
                 <td id="marketplace-roi-${currentOrderIndex}" style="padding:12px 8px; text-align:right; font-weight:600; color:${singleROIColor};">${singleROI}${singleROI !== 'N/A' ? '%' : ''}</td>
@@ -2694,13 +2768,17 @@
                     <td style="padding:8px; text-align:right; font-size:12px;">-</td>
                     <td style="padding:8px; text-align:right; font-size:12px; color:#22c55e;">$${orderEarnings.toFixed(2)}</td>
                     <td style="padding:8px; text-align:right;">
-                      <input type="number"
-                             step="0.01"
-                             value="${orderCOGS.toFixed(2)}"
-                             data-transaction-id="${order.id}"
-                             data-marketplace-index="${currentOrderIndex}"
-                             onchange="updateMarketplaceCalc(${currentOrderIndex})"
-                             style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;" />
+                      ${adminEnabled ? `
+                        <input type="number"
+                               step="0.01"
+                               value="${orderCOGS.toFixed(2)}"
+                               data-transaction-id="${order.id}"
+                               data-marketplace-index="${currentOrderIndex}"
+                               onchange="updateMarketplaceCalc(${currentOrderIndex})"
+                               style="width:80px; text-align:right; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;" />
+                      ` : `
+                        <div style="font-size:12px;">${orderCOGS > 0 ? '$' + orderCOGS.toFixed(2) : '-'}</div>
+                      `}
                     </td>
                     <td id="marketplace-profit-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderProfitColor};">$${orderProfit.toFixed(2)}</td>
                     <td id="marketplace-roi-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderROIColor};">${orderROI}${orderROI !== 'N/A' ? '%' : ''}</td>
@@ -2833,20 +2911,12 @@
 
     // Initialize
     document.addEventListener("DOMContentLoaded", () => {
-      // Start in view-only mode - show tabs but disable editing
-      document.querySelector('.tabs').style.display = 'flex';
-      document.getElementById("adminStatus").innerHTML = '👁️ View Only';
+      // Start in view-only mode - show ALL tabs but disable editing
+      // Non-admin users can VIEW everything, just can't EDIT
+      updateUIForAdminMode();
 
-      // Hide admin-only tabs initially (Import, COGS Rules, Master Catalog)
-      const importTab = document.querySelector('.tab[onclick*="import"]');
-      const rulesTab = document.querySelector('.tab[onclick*="cogs-rules"]');
-      const catalogTab = document.querySelector('.tab[onclick*="master-catalog"]');
-      importTab.style.display = 'none';
-      rulesTab.style.display = 'none';
-      catalogTab.style.display = 'none';
-
-      // Show Shows tab by default (view-only mode)
-      showTab('shows');
+      // Show Analytics tab by default (view-only mode)
+      showTab('analytics');
 
       // Allow Enter key to enable admin
       document.getElementById("adminPin").addEventListener("keypress", (e) => {

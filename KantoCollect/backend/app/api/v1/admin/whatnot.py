@@ -1,7 +1,8 @@
 """
 WhatNot sales tracking endpoints.
 
-All endpoints require admin authentication.
+Read endpoints (GET) require any authenticated user.
+Write endpoints (POST/PUT/DELETE) require admin authentication.
 """
 
 from decimal import Decimal
@@ -10,7 +11,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile, status
 from sqlmodel import Session, select, or_
 
-from app.api.deps import AdminUser
+from app.api.deps import AdminUser, CurrentUser, OptionalUser
 from app.core.whatnot_database import get_whatnot_db
 from app.models.whatnot import (
     WhatnotShow,
@@ -85,7 +86,7 @@ def _to_cogs_rule_read(rule: COGSMappingRule) -> COGSRuleRead:
 
 @router.get("/shows", response_model=List[ShowRead])
 async def list_shows(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     search: Optional[str] = None,
     limit: int = 50,
@@ -119,7 +120,7 @@ async def create_show(
 @router.get("/shows/{show_id}", response_model=dict)
 async def get_show_details_endpoint(
     show_id: int,
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> dict:
     """Get detailed show information with transactions."""
@@ -248,7 +249,7 @@ async def import_marketplace_file(
 
 @router.get("/transactions", response_model=List[TransactionRead])
 async def list_transactions(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     show_id: Optional[int] = None,
     product_id: Optional[int] = None,
@@ -287,7 +288,7 @@ async def list_transactions(
 @router.get("/transactions/{transaction_id}", response_model=TransactionRead)
 async def get_transaction(
     transaction_id: int,
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> TransactionRead:
     """Get a single transaction."""
@@ -355,7 +356,7 @@ async def recalculate_cogs(
 
 @router.get("/products")
 async def list_products(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     search: Optional[str] = None,
     has_cogs: Optional[bool] = None,
@@ -461,7 +462,7 @@ async def list_products(
 @router.get("/products/{product_id}", response_model=ProductRead)
 async def get_product(
     product_id: int,
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> ProductRead:
     """Get product details."""
@@ -497,7 +498,7 @@ async def update_product(
 
 @router.get("/buyers", response_model=List[BuyerRead])
 async def list_buyers(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     search: Optional[str] = None,
     repeat_only: bool = False,
@@ -521,7 +522,7 @@ async def list_buyers(
 @router.get("/buyers/{buyer_id}", response_model=BuyerRead)
 async def get_buyer(
     buyer_id: int,
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> BuyerRead:
     """Get buyer details."""
@@ -557,7 +558,7 @@ async def update_buyer(
 
 @router.get("/cogs-rules", response_model=List[COGSRuleRead])
 async def list_cogs_rules(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     active_only: bool = False,
 ) -> List[COGSRuleRead]:
@@ -588,7 +589,7 @@ async def create_cogs_rule(
 @router.get("/cogs-rules/{rule_id}", response_model=COGSRuleRead)
 async def get_cogs_rule(
     rule_id: int,
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> COGSRuleRead:
     """Get COGS rule details."""
@@ -676,7 +677,7 @@ async def test_cogs_rule(
 
 @router.get("/analytics/overview")
 async def get_analytics_overview(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     date_range: Optional[str] = None,
 ) -> dict:
@@ -692,7 +693,7 @@ async def get_analytics_overview(
 
 @router.get("/analytics/top-products")
 async def get_analytics_top_products(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     limit: int = 10,
     metric: str = 'revenue',
@@ -704,7 +705,7 @@ async def get_analytics_top_products(
 
 @router.get("/analytics/top-buyers")
 async def get_analytics_top_buyers(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     limit: int = 10,
     date_range: Optional[str] = None,
@@ -715,7 +716,7 @@ async def get_analytics_top_buyers(
 
 @router.get("/analytics/products-needing-cogs")
 async def get_analytics_products_needing_cogs(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
     limit: int = 50,
 ) -> List[dict]:
@@ -725,7 +726,7 @@ async def get_analytics_products_needing_cogs(
 
 @router.get("/product-catalog")
 async def get_product_catalog(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> dict:
     """Get product catalog from database with rule-based matching."""
@@ -1108,7 +1109,7 @@ async def delete_catalog_item(
 
 @router.get("/analytics/cogs-rule-performance")
 async def get_analytics_rule_performance(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> List[dict]:
     """Get COGS rule performance statistics."""
@@ -1175,7 +1176,7 @@ async def mark_catalog_item_mapped(
 
 @router.get("/analytics/mapping-status")
 async def get_mapping_status(
-    current_user: AdminUser,
+    current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> dict:
     """Get overview of mapped vs unmapped transactions."""

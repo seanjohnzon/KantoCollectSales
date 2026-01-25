@@ -4,7 +4,7 @@ API Dependencies.
 Shared dependencies for authentication, database sessions, etc.
 """
 
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -16,7 +16,7 @@ from app.core.security import decode_access_token, TokenData
 from app.models.user import User, UserRole
 
 # OAuth2 scheme for token authentication
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 async def get_current_user(
@@ -43,6 +43,10 @@ async def get_current_user(
         detail="Not authenticated",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # If no token provided, raise exception
+    if not token:
+        raise credentials_exception
 
     # Check if token is the simple admin key
     if token == settings.admin_key:
@@ -77,6 +81,30 @@ async def get_current_user(
     return user
 
 
+async def get_optional_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Optional[User]:
+    """
+    Dependency to get the current user if authenticated, otherwise None.
+    Used for read-only endpoints that don't require authentication.
+
+    Args:
+        token: JWT access token from Authorization header or simple admin key.
+        db: Database session.
+
+    Returns:
+        User | None: The authenticated user or None if not authenticated.
+    """
+    if not token:
+        return None
+
+    try:
+        return await get_current_user(token, db)
+    except HTTPException:
+        return None
+
+
 async def get_current_admin_user(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
@@ -103,4 +131,5 @@ async def get_current_admin_user(
 # Type aliases for cleaner dependency injection
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AdminUser = Annotated[User, Depends(get_current_admin_user)]
+OptionalUser = Annotated[Optional[User], Depends(get_optional_user)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]
