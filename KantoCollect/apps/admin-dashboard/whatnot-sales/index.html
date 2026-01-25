@@ -1398,22 +1398,54 @@
               </td>
               <td style="padding:12px 8px;">
                 <div id="keywords-display-${p.id}" style="display:flex; align-items:center; gap:8px;">
-                  <div style="font-size:11px; color:#64748b; max-width:250px; overflow:hidden; text-overflow:ellipsis;">${p.keywords.join(', ')}</div>
+                  <div style="font-size:11px; color:#64748b; max-width:250px; overflow:hidden; text-overflow:ellipsis;">
+                    <div style="margin-bottom:4px;">
+                      <span style="color:#94a3b8; font-weight:600;">${getRuleTypeLabel(p.ruleType)}</span>
+                    </div>
+                    <div style="color:#22c55e;">Include: ${p.includeKeywords && p.includeKeywords.length > 0 ? p.includeKeywords.join(', ') : '(none)'}</div>
+                    ${p.excludeKeywords && p.excludeKeywords.length > 0 ? `<div style="color:#ef4444;">Exclude: ${p.excludeKeywords.join(', ')}</div>` : ''}
+                  </div>
                   <button onclick="editKeywords(${p.id})"
                           id="edit-keywords-btn-${p.id}"
                           style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px; white-space:nowrap;"
-                          title="Edit keywords">
+                          title="Edit rule-based keywords">
                     ✏️ Edit
                   </button>
                 </div>
                 <div id="keywords-edit-${p.id}" style="display:none;">
-                  <textarea id="keywords-input-${p.id}"
-                            style="width:100%; min-height:60px; padding:8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px; resize:vertical;"
-                            placeholder="Enter keywords separated by commas">${p.keywords.join(', ')}</textarea>
+                  <div style="margin-bottom:8px;">
+                    <label style="display:block; font-size:11px; color:#94a3b8; margin-bottom:4px;">Rule Type:</label>
+                    <select id="rule-type-${p.id}"
+                            style="width:100%; padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;">
+                      <option value="include_any" ${p.ruleType === 'include_any' ? 'selected' : ''}>INCLUDE ANY - Contains at least one keyword</option>
+                      <option value="include_all" ${p.ruleType === 'include_all' ? 'selected' : ''}>INCLUDE ALL - Contains all keywords</option>
+                      <option value="include_and_exclude" ${p.ruleType === 'include_and_exclude' ? 'selected' : ''}>INCLUDE + EXCLUDE - Contains include but not exclude</option>
+                      <option value="catch_all" ${p.ruleType === 'catch_all' ? 'selected' : ''}>CATCH ALL - Catches unmatched items</option>
+                    </select>
+                  </div>
+                  <div style="margin-bottom:8px;">
+                    <label style="display:block; font-size:11px; color:#22c55e; margin-bottom:4px;">Include Keywords (comma-separated):</label>
+                    <textarea id="include-keywords-${p.id}"
+                              style="width:100%; min-height:50px; padding:8px; background:#0f172a; border:1px solid #22c55e; color:#e2e8f0; border-radius:4px; font-size:12px; resize:vertical;"
+                              placeholder="keyword1, keyword2, keyword3">${p.includeKeywords ? p.includeKeywords.join(', ') : ''}</textarea>
+                  </div>
+                  <div style="margin-bottom:8px;">
+                    <label style="display:block; font-size:11px; color:#ef4444; margin-bottom:4px;">Exclude Keywords (comma-separated, optional):</label>
+                    <textarea id="exclude-keywords-${p.id}"
+                              style="width:100%; min-height:40px; padding:8px; background:#0f172a; border:1px solid #ef4444; color:#e2e8f0; border-radius:4px; font-size:12px; resize:vertical;"
+                              placeholder="keyword to exclude, another exclude">${p.excludeKeywords ? p.excludeKeywords.join(', ') : ''}</textarea>
+                  </div>
+                  <div style="margin-bottom:8px;">
+                    <label style="display:block; font-size:11px; color:#94a3b8; margin-bottom:4px;">Priority (higher = checked first):</label>
+                    <input type="number"
+                           id="priority-${p.id}"
+                           value="${p.priority || 100}"
+                           style="width:100px; padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;" />
+                  </div>
                   <div style="display:flex; gap:8px; margin-top:8px;">
                     <button onclick="applyKeywords(${p.id})"
                             style="padding:6px 12px; background:#22c55e; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
-                            title="Apply keyword changes">
+                            title="Apply rule changes">
                       ✓ Apply
                     </button>
                     <button onclick="cancelEditKeywords(${p.id})"
@@ -1542,53 +1574,78 @@
 
         const transactions = await res.json();
 
-        // Match transactions using "longest keyword wins" logic (same as backend)
-        // "Unmapped Items" loses ties to specific catalog items
+        // NEW RULE-BASED MATCHING LOGIC (matches backend)
         const matches = [];
+
+        // Sort catalog items by priority (DESC) to match backend ordering
+        const sortedCatalog = [...catalogProducts].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+        // Find CATCH_ALL item
+        const catchAllItem = sortedCatalog.find(item => item.ruleType === 'catch_all');
 
         for (const t of transactions) {
           const itemNameLower = t.item_name.toLowerCase();
+          let matchedItem = null;
+          let matchedKeyword = null;
 
-          // Find the best match across ALL catalog items (longest keyword)
-          let bestMatch = null;
-          let bestKeywordLength = 0;
-          let bestKeyword = null;
-          let bestIsUnmapped = false;
+          // Try to match against catalog items (ordered by priority)
+          for (const catalogItem of sortedCatalog) {
+            // Skip CATCH_ALL items in this pass
+            if (catalogItem.ruleType === 'catch_all') continue;
 
-          for (const catalogItem of catalogProducts) {
-            const isUnmapped = catalogItem.name === "Unmapped Items";
+            let match = false;
 
-            for (const keyword of catalogItem.keywords) {
-              const keywordLower = keyword.toLowerCase();
-              if (keywordLower && itemNameLower.includes(keywordLower)) {
-                const keywordLen = keywordLower.length;
-                let shouldUpdate = false;
+            if (catalogItem.ruleType === 'include_all') {
+              // Must contain ALL include keywords
+              match = catalogItem.includeKeywords && catalogItem.includeKeywords.every(
+                kw => itemNameLower.includes(kw.toLowerCase())
+              );
+              if (match) matchedKeyword = catalogItem.includeKeywords.join(' + ');
 
-                if (keywordLen > bestKeywordLength) {
-                  // Longer keyword always wins
-                  shouldUpdate = true;
-                } else if (keywordLen === bestKeywordLength) {
-                  // Same length - prefer non-Unmapped Items
-                  if (bestIsUnmapped && !isUnmapped) {
-                    shouldUpdate = true;
-                  }
-                }
-
-                if (shouldUpdate) {
-                  bestMatch = catalogItem.id;
-                  bestKeywordLength = keywordLen;
-                  bestKeyword = keyword;
-                  bestIsUnmapped = isUnmapped;
-                }
+            } else if (catalogItem.ruleType === 'include_any') {
+              // Must contain AT LEAST ONE include keyword
+              const matchedKw = catalogItem.includeKeywords && catalogItem.includeKeywords.find(
+                kw => itemNameLower.includes(kw.toLowerCase())
+              );
+              if (matchedKw) {
+                match = true;
+                matchedKeyword = matchedKw;
               }
+
+            } else if (catalogItem.ruleType === 'include_and_exclude') {
+              // Must have include keywords but NOT exclude keywords
+              const hasInclude = catalogItem.includeKeywords && catalogItem.includeKeywords.some(
+                kw => itemNameLower.includes(kw.toLowerCase())
+              );
+              const hasExclude = catalogItem.excludeKeywords && catalogItem.excludeKeywords.some(
+                kw => itemNameLower.includes(kw.toLowerCase())
+              );
+              match = hasInclude && !hasExclude;
+              if (match) {
+                matchedKeyword = catalogItem.includeKeywords.find(
+                  kw => itemNameLower.includes(kw.toLowerCase())
+                );
+              }
+            }
+
+            // If matched, assign to this catalog item and stop checking
+            if (match) {
+              matchedItem = catalogItem.id;
+              break;
             }
           }
 
+          // If no match found and we have a CATCH_ALL item, assign to it
+          if (!matchedItem && catchAllItem) {
+            matchedItem = catchAllItem.id;
+            matchedKeyword = '(catch all)';
+          }
+
           // Only include this transaction if it matched THIS product
-          if (bestMatch === productId) {
+          if (matchedItem === productId) {
             matches.push({
               ...t,
-              matchedKeyword: bestKeyword
+              matchedKeyword: matchedKeyword || '(unknown)'
             });
           }
         }
@@ -1630,14 +1687,25 @@
       }
     }
 
+    // Helper: Get rule type label
+    function getRuleTypeLabel(ruleType) {
+      const labels = {
+        'include_any': 'ANY',
+        'include_all': 'ALL',
+        'include_and_exclude': 'INCLUDE+EXCLUDE',
+        'catch_all': 'CATCH ALL'
+      };
+      return labels[ruleType] || 'ANY';
+    }
+
     // Edit keywords for a catalog item
     function editKeywords(productId) {
       // Hide display, show edit
       document.getElementById(`keywords-display-${productId}`).style.display = 'none';
       document.getElementById(`keywords-edit-${productId}`).style.display = 'block';
 
-      // Focus the textarea
-      document.getElementById(`keywords-input-${productId}`).focus();
+      // Focus the first textarea
+      document.getElementById(`include-keywords-${productId}`).focus();
     }
 
     // Cancel editing keywords
@@ -1646,32 +1714,42 @@
       document.getElementById(`keywords-display-${productId}`).style.display = 'flex';
       document.getElementById(`keywords-edit-${productId}`).style.display = 'none';
 
-      // Reset textarea to original keywords
+      // Reset fields to original values
       const product = catalogProducts.find(p => p.id === productId);
       if (product) {
-        document.getElementById(`keywords-input-${productId}`).value = product.keywords.join(', ');
+        document.getElementById(`rule-type-${productId}`).value = product.ruleType || 'include_any';
+        document.getElementById(`include-keywords-${productId}`).value = product.includeKeywords ? product.includeKeywords.join(', ') : '';
+        document.getElementById(`exclude-keywords-${productId}`).value = product.excludeKeywords ? product.excludeKeywords.join(', ') : '';
+        document.getElementById(`priority-${productId}`).value = product.priority || 100;
       }
     }
 
     // Apply keyword changes
     async function applyKeywords(productId) {
       try {
-        const textarea = document.getElementById(`keywords-input-${productId}`);
-        const keywordsText = textarea.value.trim();
+        // Get rule type
+        const ruleType = document.getElementById(`rule-type-${productId}`).value;
 
-        if (!keywordsText) {
-          alert('Keywords cannot be empty');
-          return;
-        }
-
-        // Parse keywords (split by comma, trim, filter empty)
-        const keywords = keywordsText
+        // Get include keywords
+        const includeText = document.getElementById(`include-keywords-${productId}`).value.trim();
+        const includeKeywords = includeText
           .split(',')
           .map(k => k.trim())
           .filter(k => k.length > 0);
 
-        if (keywords.length === 0) {
-          alert('Please enter at least one keyword');
+        // Get exclude keywords
+        const excludeText = document.getElementById(`exclude-keywords-${productId}`).value.trim();
+        const excludeKeywords = excludeText
+          .split(',')
+          .map(k => k.trim())
+          .filter(k => k.length > 0);
+
+        // Get priority
+        const priority = parseInt(document.getElementById(`priority-${productId}`).value) || 100;
+
+        // Validate: CATCH_ALL doesn't need keywords, others need at least include keywords
+        if (ruleType !== 'catch_all' && includeKeywords.length === 0) {
+          alert('Please enter at least one include keyword (or select CATCH ALL rule type)');
           return;
         }
 
@@ -1682,7 +1760,13 @@
             ...authHeaders(),
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ keywords })
+          body: JSON.stringify({
+            rule_type: ruleType,
+            include_keywords: includeKeywords,
+            exclude_keywords: excludeKeywords,
+            priority: priority,
+            keywords: includeKeywords  // DEPRECATED: Keep for backward compatibility
+          })
         });
 
         if (!res.ok) {
