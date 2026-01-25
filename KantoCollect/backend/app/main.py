@@ -64,6 +64,8 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:8000",
+        "https://kantocollectsales-production.up.railway.app",  # Railway production
+        "*",  # Allow all origins for API access
     ],
     allow_credentials=True,
     allow_methods=["*"],
