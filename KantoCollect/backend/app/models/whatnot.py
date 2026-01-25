@@ -50,19 +50,19 @@ class WhatnotShow(SQLModel, table=True):
     platform: str = Field(default="WhatNot")
 
     # Pre-computed aggregates
-    total_gross_sales: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_discounts: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_whatnot_commission: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_whatnot_fees: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_payment_fees: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_shipping: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_net_earnings: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_cogs: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_net_profit: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
+    total_gross_sales: Decimal = Field(default=Decimal("0"))
+    total_discounts: Decimal = Field(default=Decimal("0"))
+    total_whatnot_commission: Decimal = Field(default=Decimal("0"))
+    total_whatnot_fees: Decimal = Field(default=Decimal("0"))
+    total_payment_fees: Decimal = Field(default=Decimal("0"))
+    total_shipping: Decimal = Field(default=Decimal("0"))
+    total_net_earnings: Decimal = Field(default=Decimal("0"))
+    total_cogs: Decimal = Field(default=Decimal("0"))
+    total_net_profit: Decimal = Field(default=Decimal("0"))
 
     item_count: int = Field(default=0)
     unique_buyers: int = Field(default=0)
-    avg_sale_price: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
+    avg_sale_price: Decimal = Field(default=Decimal("0"))
 
     # Import metadata
     excel_filename: Optional[str] = None
@@ -96,24 +96,24 @@ class SalesTransaction(SQLModel, table=True):
 
     # Marketplace-specific fields
     payment_status: Optional[str] = None  # For marketplace: Completed, Pending, etc.
-    total_revenue: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)  # Marketplace uses this instead of gross_sale_price
+    total_revenue: Optional[Decimal] = Field(default=None)  # Marketplace uses this instead of gross_sale_price
 
     # Financial data
-    gross_sale_price: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    discount: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    whatnot_commission: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    whatnot_fee: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    payment_processing_fee: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    shipping: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    net_earnings: Decimal = Field(max_digits=10, decimal_places=2)
+    gross_sale_price: Decimal = Field(default=Decimal("0"))
+    discount: Decimal = Field(default=Decimal("0"))
+    whatnot_commission: Decimal = Field(default=Decimal("0"))
+    whatnot_fee: Decimal = Field(default=Decimal("0"))
+    payment_processing_fee: Decimal = Field(default=Decimal("0"))
+    shipping: Decimal = Field(default=Decimal("0"))
+    net_earnings: Decimal = Field(default=Decimal("0"))
 
     # Notes field for marketplace
     notes: Optional[str] = None
 
     # COGS and profit
-    cogs: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
-    net_profit: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
-    roi_percent: Optional[Decimal] = Field(default=None, max_digits=8, decimal_places=2)
+    cogs: Optional[Decimal] = Field(default=None)
+    net_profit: Optional[Decimal] = Field(default=None)
+    roi_percent: Optional[Decimal] = Field(default=None)
 
     # Normalized references
     product_id: Optional[int] = Field(default=None, foreign_key="whatnot_products.id", index=True)
@@ -156,13 +156,13 @@ class WhatnotProduct(SQLModel, table=True):
 
     # Aggregated metrics (updated on import)
     total_quantity_sold: int = Field(default=0)
-    total_gross_sales: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_net_earnings: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    avg_sale_price: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
+    total_gross_sales: Decimal = Field(default=Decimal("0"))
+    total_net_earnings: Decimal = Field(default=Decimal("0"))
+    avg_sale_price: Decimal = Field(default=Decimal("0"))
 
     # Inventory linking
     master_card_id: Optional[int] = Field(default=None, index=True)
-    default_cogs: Optional[Decimal] = Field(default=None, max_digits=10, decimal_places=2)
+    default_cogs: Optional[Decimal] = Field(default=None)
     category: Optional[str] = None
 
     # Metadata
@@ -187,8 +187,8 @@ class WhatnotBuyer(SQLModel, table=True):
 
     # Aggregated metrics
     total_purchases: int = Field(default=0)
-    total_spent: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    avg_purchase_price: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
+    total_spent: Decimal = Field(default=Decimal("0"))
+    avg_purchase_price: Decimal = Field(default=Decimal("0"))
 
     # Engagement
     first_purchase_date: Optional[date] = None
@@ -215,7 +215,7 @@ class COGSMappingRule(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     rule_name: str
     keywords: List[str] = Field(sa_column=Column(JSON))  # JSON array of strings
-    cogs_amount: Decimal = Field(max_digits=10, decimal_places=2)
+    cogs_amount: Decimal = Field()
     match_type: MatchType = Field(default=MatchType.CONTAINS)
     priority: int = Field(default=50, index=True)  # Higher = checked first
     is_active: bool = Field(default=True)
@@ -239,11 +239,11 @@ class MonthlySummary(SQLModel, table=True):
 
     show_count: int = Field(default=0)
     total_items_sold: int = Field(default=0)
-    total_gross_sales: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_net_earnings: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_cogs: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    total_net_profit: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
-    avg_roi_percent: Optional[Decimal] = Field(default=None, max_digits=8, decimal_places=2)
+    total_gross_sales: Decimal = Field(default=Decimal("0"))
+    total_net_earnings: Decimal = Field(default=Decimal("0"))
+    total_cogs: Decimal = Field(default=Decimal("0"))
+    total_net_profit: Decimal = Field(default=Decimal("0"))
+    avg_roi_percent: Optional[Decimal] = Field(default=None)
 
     unique_buyers: int = Field(default=0)
     unique_products: int = Field(default=0)
@@ -285,7 +285,7 @@ class ProductCatalog(SQLModel, table=True):
 
     # These will be computed from transactions
     sales_count: int = Field(default=0)  # Number of sales matched
-    total_revenue: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
+    total_revenue: Decimal = Field(default=Decimal("0"))
 
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
