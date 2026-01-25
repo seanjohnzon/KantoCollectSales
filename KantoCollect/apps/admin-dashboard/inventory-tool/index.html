@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kanto Collect - Inventory Tool</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+      header { padding: 24px; background: #111827; border-bottom: 1px solid #1f2937; }
+      main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+      h1 { margin: 0; font-size: 24px; }
+      .card { background: #111827; padding: 16px; border-radius: 12px; border: 1px solid #1f2937; margin-bottom: 16px; }
+      label { display: block; margin: 8px 0 4px; font-size: 12px; color: #94a3b8; }
+      input, select, button { padding: 8px 10px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; }
+      button { cursor: pointer; background: #22c55e; border-color: #22c55e; color: #0f172a; font-weight: 600; }
+      button.secondary { background: #0f172a; color: #e2e8f0; border-color: #334155; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+      .muted { color: #94a3b8; font-size: 12px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>📦 Kanto Collect Inventory (One Piece)</h1>
+      <div class="muted">Local-only inventory database (separate from the card tracker)</div>
+    </header>
+    <main>
+      <div class="card">
+        <h2>🔐 Admin Token</h2>
+        <label for="tokenInput">JWT Token</label>
+        <input id="tokenInput" placeholder="Paste admin JWT token" style="width: 100%;" />
+        <div class="row" style="margin-top:8px;">
+          <button class="secondary" onclick="saveToken()">Save Token</button>
+          <span id="tokenStatus" class="muted"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔍 Search Master Cards</h2>
+        <div class="row">
+          <input id="searchInput" placeholder="Card name or number" style="flex:1;" />
+          <button onclick="searchCards()">Search</button>
+        </div>
+        <div id="searchResults" class="grid" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h2>➕ Add Inventory Item</h2>
+        <label for="masterCardId">Master Card ID</label>
+        <input id="masterCardId" placeholder="Select from search results" />
+        <label for="quantityInput">Quantity</label>
+        <input id="quantityInput" type="number" min="1" value="1" />
+        <div class="row" style="margin-top:8px;">
+          <button onclick="addInventoryItem()">Add Item</button>
+          <span id="addStatus" class="muted"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📋 Inventory Items</h2>
+        <button class="secondary" onclick="loadInventory()">Refresh</button>
+        <div id="inventoryList" class="grid" style="margin-top:12px;"></div>
+      </div>
+    </main>
+
+    <script>
+      const apiBase = "/api/v1/admin/inventory";
+      function getToken() { return localStorage.getItem("kc_admin_token") || ""; }
+      function saveToken() {
+        const token = document.getElementById("tokenInput").value.trim();
+        localStorage.setItem("kc_admin_token", token);
+        document.getElementById("tokenStatus").textContent = token ? "Saved." : "Cleared.";
+      }
+      function authHeaders() {
+        const token = getToken();
+        return token ? { "Authorization": `Bearer ${token}` } : {};
+      }
+
+      async function searchCards() {
+        const query = document.getElementById("searchInput").value.trim();
+        const res = await fetch(`${apiBase}/cards?search=${encodeURIComponent(query)}`, { headers: authHeaders() });
+        const data = await res.json();
+        const container = document.getElementById("searchResults");
+        container.innerHTML = "";
+        data.forEach(card => {
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <strong>${card.name}</strong>
+            <div class="muted">${card.card_number} · ${card.set_code}</div>
+            <button class="secondary" style="margin-top:8px;" onclick="selectCard(${card.id})">Use Card</button>
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      function selectCard(id) {
+        document.getElementById("masterCardId").value = id;
+      }
+
+      async function addInventoryItem() {
+        const masterCardId = Number(document.getElementById("masterCardId").value);
+        const quantity = Number(document.getElementById("quantityInput").value);
+        const res = await fetch(`${apiBase}/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ master_card_id: masterCardId, quantity })
+        });
+        document.getElementById("addStatus").textContent = res.ok ? "Added." : "Error adding item.";
+        if (res.ok) loadInventory();
+      }
+
+      async function loadInventory() {
+        const res = await fetch(`${apiBase}/`, { headers: authHeaders() });
+        const data = await res.json();
+        const container = document.getElementById("inventoryList");
+        container.innerHTML = "";
+        data.forEach(item => {
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <strong>${item.card?.name || "Unknown Card"}</strong>
+            <div class="muted">Qty: ${item.quantity} · ${item.card?.card_number || "-"}</div>
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const token = getToken();
+        if (token) document.getElementById("tokenInput").value = token;
+        loadInventory();
+      });
+    </script>
+  </body>
+</html>

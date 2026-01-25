@@ -46,11 +46,19 @@
 ## 📦 Phase 2: Inventory Tool
 
 ### Core Features
-- [ ] Product model and database
-- [ ] CRUD endpoints for products
+- [ ] Product model and database (One Piece first)
+- [ ] CRUD endpoints for inventory items and master cards
 - [ ] Category management
 - [ ] Stock level tracking
 - [ ] Low stock alerts
+- [ ] Locations/ownership tracking (who has it / where it is)
+- [ ] Profit math (cost basis, fees, net profit, margin)
+
+### Sales Tracking (CSV Import)
+- [ ] Define sales CSV schema + mapping (Whatnot export)
+- [ ] Import endpoint + validation
+- [ ] Link sales rows to inventory items
+- [ ] Profit rollups by show/date/channel
 
 ### Scanning
 - [ ] Barcode scanner integration
@@ -62,6 +70,9 @@
 - [ ] Add/Edit forms
 - [ ] Search and filters
 - [ ] Dashboard with stats
+
+### Active (2026-01-19)
+- [ ] Build local One Piece inventory tool (separate DB + UI)
 
 ---
 
@@ -142,6 +153,7 @@
 - [x] JWT token decode fix (sub must allow integer)
 - [x] Database path fix (load .env from parent directory)
 - [ ] PriceCharting search returns mixed categories (need filtering)
+- [ ] Define Whatnot sales CSV schema + import mapping
 
 ---
 

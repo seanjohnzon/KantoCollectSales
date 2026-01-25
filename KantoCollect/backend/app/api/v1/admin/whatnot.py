@@ -18,6 +18,7 @@ from app.models.whatnot import (
     WhatnotProduct,
     WhatnotBuyer,
     COGSMappingRule,
+    ProductCatalog,
     ShowRead,
     ShowCreate,
     ShowUpdate,
@@ -30,6 +31,9 @@ from app.models.whatnot import (
     COGSRuleRead,
     COGSRuleCreate,
     COGSRuleUpdate,
+    ProductCatalogRead,
+    ProductCatalogCreate,
+    ProductCatalogUpdate,
     ImportResult,
 )
 from app.services.whatnot.import_service import import_excel_show
@@ -655,64 +659,42 @@ async def get_product_catalog(
     current_user: AdminUser,
     db: Session = Depends(get_whatnot_db),
 ) -> dict:
-    """Get static product catalog - manually managed, doesn't change with imports."""
-    base_url = "https://ik.imagekit.io/homecraft/Item%20Pics/"
+    """Get product catalog from database."""
+    # Get all catalog items from database
+    catalog_items = db.exec(select(ProductCatalog)).all()
 
-    # Static catalog - admin can add to this manually
-    catalog_products = [
-        {"id": 1, "name": "Mega Charizard X ex Ultra Premium Collection", "category": "UPC", "image": "Mega Charizard X ex Ultra Premium Collection.jpg", "keywords": ["mega charizard x", "ultra premium", "upc"]},
-        {"id": 2, "name": "Team Rocket's Moltres ex Ultra-Premium Collection", "category": "UPC", "image": "Team Rocket_s Moltres ex Ultra-Premium Collection.jpg", "keywords": ["team rocket moltres", "ultra premium", "moltres upc"]},
-        {"id": 3, "name": "The Azure Sea's Seven Booster Box (OP14)", "category": "Booster Box", "image": "The Azure Sea's Seven Booster Box(OP14).jpg", "keywords": ["op14 booster box", "op 14 booster box", "azure sea"]},
-        {"id": 4, "name": "Black Bolt Elite Trainer Box", "category": "ETB", "image": "Pokemon Scarlet & Violet Black Bolt Elite Trainer Box .jpeg", "keywords": ["black bolt etb", "elite trainer box"]},
-        {"id": 5, "name": "Phantasmal Flames Elite Trainer Box", "category": "ETB", "image": "Phantasmal Flames Elite Trainer Box.jpg", "keywords": ["phantasmal flames etb", "fantasmal flames", "elite trainer box"]},
-        {"id": 6, "name": "Surging Sparks Elite Trainer Box", "category": "ETB", "image": "Surging Sparks Elite Trainer Box.jpg", "keywords": ["surging sparks etb", "elite trainer box"]},
-        {"id": 7, "name": "Twilight Masquerade Elite Trainer Box", "category": "ETB", "image": "Twilight Masquerade Elite Trainer Box.jpg", "keywords": ["twilight masquerade etb", "twilight", "elite trainer box"]},
-        {"id": 8, "name": "White Flare Elite Trainer Box", "category": "ETB", "image": "White Flare Elite Trainer Box.jpg", "keywords": ["white flare etb", "elite trainer box"]},
-        {"id": 9, "name": "Black Bolt Booster Bundle", "category": "Booster Bundle", "image": "Black Bolt Booster Bundle.jpg", "keywords": ["black bolt booster bundle", "booster bundle"]},
-        {"id": 10, "name": "Mega Evolution Booster Bundle", "category": "Booster Bundle", "image": "Mega Evolution Booster Bundle .webp", "keywords": ["mega evolution booster bundle", "booster bundle"]},
-        {"id": 11, "name": "Phantasmal Flames Booster Bundle", "category": "Booster Bundle", "image": "Phantasmal Flames Booster Bundle.jpg", "keywords": ["phantasmal flames booster bundle", "booster bundle"]},
-        {"id": 12, "name": "Prismatic Evolutions Booster Bundle", "category": "Booster Bundle", "image": "Prismatic Evolutions Booster Bundle.jpg", "keywords": ["prismatic evolutions booster bundle", "booster bundle"]},
-        {"id": 13, "name": "Shrouded Fable Booster Bundle", "category": "Booster Bundle", "image": "Shrouded Fable Booster Bundle.jpg", "keywords": ["shrouded fable booster bundle", "booster bundle"]},
-        {"id": 14, "name": "Surging Sparks Booster Bundle", "category": "Booster Bundle", "image": "Surging Sparks Booster Bundle.jpg", "keywords": ["surging sparks booster bundle", "booster bundle"]},
-        {"id": 15, "name": "Armarouge ex Premium Collection", "category": "Premium Collection", "image": "Armarouge ex Premium Collection.jpg", "keywords": ["armarouge", "premium collection"]},
-        {"id": 16, "name": "Hydreigon ex & Dragapult ex Premium Collection", "category": "Premium Collection", "image": "Hydreigon ex & Dragapult ex Premium Collection.jpg", "keywords": ["hydreigon", "dragapult", "premium collection"]},
-        {"id": 17, "name": "Mega Lucario ex Premium Figure Collection", "category": "Premium Collection", "image": "Mega Lucario ex Premium Figure Collection.jpg", "keywords": ["mega lucario", "figure collection"]},
-        {"id": 18, "name": "Mega Venusaur ex Premium Collection", "category": "Premium Collection", "image": "Mega Venusaur ex Premium Collection.jpg", "keywords": ["mega venusaur", "premium collection"]},
-        {"id": 19, "name": "Prismatic Evolutions Premium Figure Collection", "category": "Premium Collection", "image": "Prismatic Evolutions Premium Figure Collection.jpg", "keywords": ["prismatic evolutions", "premium figure collection"]},
-        {"id": 20, "name": "Unova Heavy Hitters Premium Collection", "category": "Premium Collection", "image": "Unova Heavy Hitters Premium Collection.jpg", "keywords": ["unova heavy hitters", "premium collection"]},
-        {"id": 21, "name": "Phantasmal Flames 3 Pack Blister", "category": "3 Pack Blister", "image": "Phantasmal Flames 3 Pack Blister _Sneasel_.jpg", "keywords": ["3 pack blister", "phantasmal flames", "blister"]},
-        {"id": 22, "name": "Pokeball Tin", "category": "Tin", "image": "Pokeball Tin.webp", "keywords": ["poke ball tin", "pokeball tin"]},
-        {"id": 23, "name": "Mega Heroes Mini Tin", "category": "Tin", "image": "Mega Heroes Mini Tin.jpg", "keywords": ["mega heroes mini tin", "mini tin"]},
-        {"id": 24, "name": "Prismatic Evolutions Mini Tin", "category": "Tin", "image": "Prismatic Evolutions Mini Tin.jpg", "keywords": ["prismatic evolutions mini tin", "mini tin"]},
-        {"id": 25, "name": "Luffy Parallel OP-13-118", "category": "Singles", "image": "Monkey.D.Luffy (118) (Parallel) - Carrying On His Will (OP13).jpg", "keywords": ["luffy parallel", "op-13-118", "op13-118", "luffy 118"]},
-        {"id": 26, "name": "Ace Parallel OP-13-119", "category": "Singles", "image": "Portgas.D.Ace (119) (Parallel) - Carrying On His Will (OP13).jpg", "keywords": ["ace parallel", "op13-119", "op-13-119", "ace 119"]},
-    ]
-
-    # Add image URLs and match sales data
+    # Get all transactions for matching
     transactions = db.exec(select(SalesTransaction)).all()
 
-    for p in catalog_products:
-        # Only replace spaces with %20, keep all other characters as-is
-        encoded_filename = p['image'].replace(' ', '%20')
-        p['imageUrl'] = base_url + encoded_filename
-        p['cogs'] = None
-        p['sales'] = 0
-        p['revenue'] = 0
+    # Build response
+    products = []
+    for item in catalog_items:
+        # Count sales that match keywords
+        sales = 0
+        revenue = 0.0
 
-        # Match transactions by keywords
         for t in transactions:
             item_name_lower = t.item_name.lower()
-            for keyword in p['keywords']:
+            for keyword in item.keywords:
                 if keyword.lower() in item_name_lower:
-                    p['sales'] += 1
-                    p['revenue'] += float(t.gross_sale_price)
+                    sales += 1
+                    revenue += float(t.gross_sale_price)
                     break
 
-        p['revenue'] = round(p['revenue'], 2)
+        products.append({
+            "id": item.id,
+            "name": item.name,
+            "category": item.category,
+            "imageUrl": item.image_url,
+            "keywords": item.keywords,
+            "sales": sales,
+            "revenue": round(revenue, 2),
+            "cogs": None  # For backward compatibility
+        })
 
     return {
-        "products": catalog_products,
-        "totalProducts": len(catalog_products)
+        "products": products,
+        "totalProducts": len(products)
     }
 
 
@@ -762,6 +744,144 @@ async def save_product_cogs(
         "success": True,
         "message": f"COGS rule created for {product_name}"
     }
+
+
+@router.post("/product-catalog/add")
+async def add_catalog_item(
+    payload: ProductCatalogCreate,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> ProductCatalogRead:
+    """Add new item to product catalog from image URL."""
+    import re
+    from urllib.parse import unquote
+
+    # Extract filename from URL
+    # Example: https://ik.imagekit.io/homecraft/Item%20Pics/Mega%20Battle%20Deck%20(Mega%20Diancie%20ex).jpg?updatedAt=1768894216143
+    url = payload.image_url
+
+    # Remove query params
+    url_clean = url.split('?')[0]
+
+    # Check if this URL already exists (ignoring query params)
+    existing_by_url = db.exec(
+        select(ProductCatalog).where(ProductCatalog.image_url.like(f"{url_clean}%"))
+    ).first()
+
+    if existing_by_url:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Duplicate item: This image URL is already in the Master Catalog as '{existing_by_url.name}' (ID: {existing_by_url.id})"
+        )
+
+    # Get filename (last part after /)
+    filename_encoded = url_clean.split('/')[-1]
+    filename = unquote(filename_encoded)
+
+    # Extract product name (remove extension)
+    product_name = filename.rsplit('.', 1)[0]
+    product_name = product_name.replace('_s', "'s")  # Fix apostrophes
+    product_name = product_name.replace('_', ' ')    # Replace underscores
+
+    # Check if this product name already exists
+    existing_by_name = db.exec(
+        select(ProductCatalog).where(ProductCatalog.name == product_name)
+    ).first()
+
+    if existing_by_name:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Duplicate item: A product named '{product_name}' already exists in the Master Catalog (ID: {existing_by_name.id})"
+        )
+
+    # Auto-categorize
+    name_lower = product_name.lower()
+    if 'ultra premium' in name_lower or 'upc' in name_lower:
+        category = 'UPC'
+    elif 'elite trainer box' in name_lower or 'etb' in name_lower:
+        category = 'ETB'
+    elif 'booster bundle' in name_lower:
+        category = 'Booster Bundle'
+    elif 'booster box' in name_lower:
+        category = 'Booster Box'
+    elif 'battle deck' in name_lower:
+        category = 'Battle Deck'
+    elif 'premium collection' in name_lower or 'premium figure' in name_lower:
+        category = 'Premium Collection'
+    elif 'blister' in name_lower:
+        category = '3 Pack Blister'
+    elif 'tin' in name_lower:
+        category = 'Tin'
+    elif 'sleeved' in name_lower or ('sleeve' in name_lower and 'pack' in name_lower):
+        category = 'Sleeved Packs'
+    elif '(' in product_name and ')' in product_name:
+        category = 'Singles'
+    elif 'box' in name_lower:
+        category = 'Box'
+    else:
+        category = 'Other'
+
+    # Auto-generate keywords
+    keywords = [name_lower]
+
+    # Extract card numbers
+    card_numbers = re.findall(r'op[-\s]?\d{1,2}[-\s]?\d{3}', name_lower)
+    for num in card_numbers:
+        keywords.append(num)
+        keywords.append(num.replace('-', ''))
+        keywords.append(num.replace('-', ' '))
+
+    # Add important words
+    important_words = ['mega', 'ex', 'premium', 'elite', 'booster', 'parallel', 'battle deck']
+    for word in important_words:
+        if word in name_lower:
+            keywords.append(word)
+
+    # Add product type keywords
+    if category == 'ETB':
+        keywords.extend(['elite trainer box', 'etb'])
+    elif category == 'Booster Bundle':
+        keywords.append('booster bundle')
+    elif category == 'UPC':
+        keywords.extend(['ultra premium', 'upc'])
+    elif category == 'Battle Deck':
+        keywords.append('battle deck')
+
+    # Remove duplicates
+    keywords = list(set([k.strip() for k in keywords if k.strip()]))
+
+    # Create catalog item
+    catalog_item = ProductCatalog(
+        name=product_name,
+        category=category,
+        image_url=url,
+        image_filename=filename,
+        keywords=keywords,
+        sales_count=0,
+        total_revenue=Decimal("0"),
+        created_by=current_user.id
+    )
+
+    db.add(catalog_item)
+    db.commit()
+    db.refresh(catalog_item)
+
+    return ProductCatalogRead.model_validate(catalog_item)
+
+
+@router.delete("/product-catalog/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_catalog_item(
+    item_id: int,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> None:
+    """Delete item from product catalog."""
+    item = db.get(ProductCatalog, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    db.delete(item)
+    db.commit()
 
 
 @router.get("/analytics/cogs-rule-performance")

@@ -125,3 +125,12 @@ async def whatnot_sales_ui():
     if html_file.exists():
         return FileResponse(html_file, media_type="text/html")
     return {"message": "WhatNot Sales - Loading..."}
+
+
+@app.get("/whatnot-sales/add-catalog-items")
+async def add_catalog_items_ui():
+    """Serve the Add Catalog Items helper tool."""
+    html_file = STATIC_DIR / "whatnot-sales" / "add-catalog-items.html"
+    if html_file.exists():
+        return FileResponse(html_file, media_type="text/html")
+    return {"error": "Tool not found"}

@@ -239,6 +239,27 @@ class ProductInventoryLink(SQLModel, table=True):
     notes: Optional[str] = None
 
 
+class ProductCatalog(SQLModel, table=True):
+    """Master product catalog - curated list of main product types for COGS assignment."""
+    __tablename__ = "product_catalog"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)  # Product name (clean, without extension)
+    category: str  # UPC, ETB, Booster Bundle, Singles, etc.
+    image_url: str  # Full ImageKit URL
+    image_filename: str  # Just the filename for reference
+    keywords: List[str] = Field(sa_column=Column(JSON))  # Keywords for matching
+
+    # These will be computed from transactions
+    sales_count: int = Field(default=0)  # Number of sales matched
+    total_revenue: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
+
+    # Metadata
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by: Optional[int] = None  # Admin user ID
+
+
 # === PYDANTIC SCHEMAS (for API responses) ===
 
 class ShowRead(SQLModel):
@@ -391,3 +412,28 @@ class ImportResult(SQLModel):
     warnings: List[str]
     cogs_assigned_count: int
     cogs_missing_count: int
+
+
+class ProductCatalogRead(SQLModel):
+    """Read schema for product catalog item."""
+    id: int
+    name: str
+    category: str
+    image_url: str
+    image_filename: str
+    keywords: List[str]
+    sales_count: int
+    total_revenue: Decimal
+    created_at: datetime
+
+
+class ProductCatalogCreate(SQLModel):
+    """Create schema for adding product to catalog."""
+    image_url: str  # User pastes full URL
+
+
+class ProductCatalogUpdate(SQLModel):
+    """Update schema for product catalog item."""
+    name: Optional[str] = None
+    category: Optional[str] = None
+    keywords: Optional[List[str]] = None

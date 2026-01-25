@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Missing Catalog Items</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 24px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .step {
+            background: #0f172a;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            margin-right: 12px;
+            font-weight: bold;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 300px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 16px;
+            color: #e2e8f0;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+
+        button:hover {
+            background: #2563eb;
+        }
+
+        .output {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .success {
+            color: #22c55e;
+        }
+
+        .warning {
+            color: #f59e0b;
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        code {
+            background: #0f172a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .file-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 12px;
+        }
+
+        .file-item {
+            padding: 4px 0;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Add Missing Catalog Items</h1>
+        <p class="subtitle">Complete the Master Catalog by adding the 22 missing products from ImageKit</p>
+
+        <div class="card">
+            <h2 style="margin-bottom: 16px;">Current Status</h2>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                <div class="step">
+                    <div style="font-size: 32px; font-weight: bold; color: #3b82f6;">26</div>
+                    <div class="muted">Current Items</div>
+                </div>
+                <div class="step">
+                    <div style="font-size: 32px; font-weight: bold; color: #f59e0b;">22</div>
+                    <div class="muted">Missing Items</div>
+                </div>
+                <div class="step">
+                    <div style="font-size: 32px; font-weight: bold; color: #22c55e;">48</div>
+                    <div class="muted">Target Total</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-bottom: 16px;">Instructions</h2>
+
+            <div class="step">
+                <span class="step-number">1</span>
+                <strong>Open the ImageKit folder:</strong><br>
+                <a href="https://imagekit.io/public/share/homecraft/f67513d9dbea376d1ac4fb10187b387c6344e5dcd8b3038711128ede7f6ab8555d0984eada2095e48fff6529f63f0c56ff951b5d8191bdb5ed22a5cee549648b48869a8152980ceb2082fbbc4e7632c5"
+                   target="_blank"
+                   style="color: #3b82f6;">Click here to open ImageKit folder</a>
+            </div>
+
+            <div class="step">
+                <span class="step-number">2</span>
+                <strong>Copy all 48 image filenames</strong> (one per line) and paste them in the box below:
+                <textarea id="imageKitInput" placeholder="Paste all 48 image filenames here, one per line...
+
+Example:
+Mega Charizard X ex Ultra Premium Collection.jpg
+Team Rocket_s Moltres ex Ultra-Premium Collection.jpg
+The Azure Sea's Seven Booster Box(OP14).jpg
+..."></textarea>
+            </div>
+
+            <div class="step">
+                <span class="step-number">3</span>
+                <strong>Click Generate</strong> to create the code for missing items:
+                <button onclick="generateCatalog()">🚀 Generate Missing Items</button>
+            </div>
+        </div>
+
+        <div id="resultsCard" class="card hidden">
+            <h2 style="margin-bottom: 16px;">Generated Code</h2>
+            <div id="results" class="output"></div>
+            <button onclick="copyToClipboard()" style="margin-top: 16px;">📋 Copy to Clipboard</button>
+        </div>
+    </div>
+
+    <script>
+        const EXISTING_ITEMS = new Set([
+            "Mega Charizard X ex Ultra Premium Collection.jpg",
+            "Team Rocket_s Moltres ex Ultra-Premium Collection.jpg",
+            "The Azure Sea's Seven Booster Box(OP14).jpg",
+            "Pokemon Scarlet & Violet Black Bolt Elite Trainer Box .jpeg",
+            "Phantasmal Flames Elite Trainer Box.jpg",
+            "Surging Sparks Elite Trainer Box.jpg",
+            "Twilight Masquerade Elite Trainer Box.jpg",
+            "White Flare Elite Trainer Box.jpg",
+            "Black Bolt Booster Bundle.jpg",
+            "Mega Evolution Booster Bundle .webp",
+            "Phantasmal Flames Booster Bundle.jpg",
+            "Prismatic Evolutions Booster Bundle.jpg",
+            "Shrouded Fable Booster Bundle.jpg",
+            "Surging Sparks Booster Bundle.jpg",
+            "Armarouge ex Premium Collection.jpg",
+            "Hydreigon ex & Dragapult ex Premium Collection.jpg",
+            "Mega Lucario ex Premium Figure Collection.jpg",
+            "Mega Venusaur ex Premium Collection.jpg",
+            "Prismatic Evolutions Premium Figure Collection.jpg",
+            "Unova Heavy Hitters Premium Collection.jpg",
+            "Phantasmal Flames 3 Pack Blister _Sneasel_.jpg",
+            "Pokeball Tin.webp",
+            "Mega Heroes Mini Tin.jpg",
+            "Prismatic Evolutions Mini Tin.jpg",
+            "Monkey.D.Luffy (118) (Parallel) - Carrying On His Will (OP13).jpg",
+            "Portgas.D.Ace (119) (Parallel) - Carrying On His Will (OP13).jpg",
+        ]);
+
+        function cleanFilename(filename) {
+            let name = filename.split('.')[0];  // Remove extension
+            name = name.replace(/_s/g, "'s");    // Fix apostrophes
+            name = name.replace(/_/g, ' ');      // Replace underscores with spaces
+            return name.trim();
+        }
+
+        function categorizeProduct(filename, productName) {
+            const nameLower = productName.toLowerCase();
+
+            if (nameLower.includes('ultra premium') || nameLower.includes('upc')) return 'UPC';
+            if (nameLower.includes('elite trainer box') || nameLower.includes('etb')) return 'ETB';
+            if (nameLower.includes('booster bundle')) return 'Booster Bundle';
+            if (nameLower.includes('booster box')) return 'Booster Box';
+            if (nameLower.includes('premium collection') || nameLower.includes('premium figure')) return 'Premium Collection';
+            if (nameLower.includes('blister')) return '3 Pack Blister';
+            if (nameLower.includes('tin')) return 'Tin';
+            if (nameLower.includes('sleeve') && nameLower.includes('pack')) return 'Sleeved Packs';
+            if (productName.includes('(') && productName.includes(')')) return 'Singles';
+            if (nameLower.includes('box')) return 'Box';
+            return 'Other';
+        }
+
+        function generateKeywords(productName) {
+            const nameLower = productName.toLowerCase();
+            const keywords = [nameLower];
+
+            // Extract card numbers
+            const cardNumbers = nameLower.match(/op[-\s]?\d{1,2}[-\s]?\d{3}/g) || [];
+            cardNumbers.forEach(num => {
+                keywords.push(num);
+                keywords.push(num.replace(/-/g, ''));
+                keywords.push(num.replace(/-/g, ' '));
+            });
+
+            // Add important words
+            const importantWords = ['mega', 'ex', 'premium', 'elite', 'booster', 'parallel'];
+            importantWords.forEach(word => {
+                if (nameLower.includes(word)) keywords.push(word);
+            });
+
+            // Add product type keywords
+            if (nameLower.includes('etb') || nameLower.includes('elite trainer box')) {
+                keywords.push('elite trainer box', 'etb');
+            }
+            if (nameLower.includes('booster bundle')) keywords.push('booster bundle');
+            if (nameLower.includes('ultra premium')) keywords.push('ultra premium', 'upc');
+
+            // Remove duplicates
+            return [...new Set(keywords.filter(k => k.trim()))].slice(0, 5);
+        }
+
+        function generateCatalog() {
+            const input = document.getElementById('imageKitInput').value;
+            const lines = input.split('\n').map(l => l.trim()).filter(l => l);
+
+            if (lines.length === 0) {
+                alert('Please paste the image filenames from ImageKit!');
+                return;
+            }
+
+            const missingFiles = lines.filter(f => !EXISTING_ITEMS.has(f));
+
+            let output = `<div class="success">✅ Found ${lines.length} total files</div>`;
+            output += `<div class="muted">📋 Existing in catalog: ${lines.length - missingFiles.length}</div>`;
+            output += `<div class="warning">⚠️  Missing from catalog: ${missingFiles.length}</div>`;
+
+            if (lines.length < 48) {
+                output += `<div class="warning" style="margin-top: 16px;">⚠️  WARNING: You provided ${lines.length} files but need 48 total!</div>`;
+            }
+
+            if (missingFiles.length === 0) {
+                output += `<div class="success" style="margin-top: 16px;">✅ All items already in catalog!</div>`;
+                document.getElementById('results').innerHTML = output;
+                document.getElementById('resultsCard').classList.remove('hidden');
+                return;
+            }
+
+            output += `<hr style="margin: 24px 0; border: 1px solid #334155;">`;
+            output += `<div style="margin-bottom: 16px;"><strong>Add these ${missingFiles.length} items to whatnot.py:</strong></div>`;
+            output += `<pre style="color: #22c55e; white-space: pre-wrap; word-wrap: break-word;">`;
+
+            let nextId = 27;
+            const generatedCode = [];
+
+            missingFiles.forEach(filename => {
+                const productName = cleanFilename(filename);
+                const category = categorizeProduct(filename, productName);
+                const keywords = generateKeywords(productName);
+
+                const entry = `    {"id": ${nextId}, "name": "${productName}", "category": "${category}", "image": "${filename}", "keywords": ${JSON.stringify(keywords)}},`;
+                generatedCode.push(entry);
+                output += entry + '\n';
+                nextId++;
+            });
+
+            output += `</pre>`;
+            output += `<hr style="margin: 24px 0; border: 1px solid #334155;">`;
+            output += `<div style="margin-top: 16px;"><strong>Next Steps:</strong></div>`;
+            output += `<ol style="margin-left: 20px; margin-top: 8px;">`;
+            output += `<li>Copy the code above (use the "Copy to Clipboard" button)</li>`;
+            output += `<li>Open <code>backend/app/api/v1/admin/whatnot.py</code></li>`;
+            output += `<li>Find the <code>catalog_products</code> list (around line 662)</li>`;
+            output += `<li>Paste the new items after the existing 26 items (before the closing bracket)</li>`;
+            output += `<li>Save the file and restart the server</li>`;
+            output += `<li>Refresh the Master Catalog tab to see all 48 items!</li>`;
+            output += `</ol>`;
+
+            document.getElementById('results').innerHTML = output;
+            document.getElementById('resultsCard').classList.remove('hidden');
+
+            // Store for clipboard copy
+            window.generatedCode = generatedCode.join('\n');
+        }
+
+        function copyToClipboard() {
+            if (window.generatedCode) {
+                navigator.clipboard.writeText(window.generatedCode).then(() => {
+                    alert('✅ Code copied to clipboard!');
+                }).catch(() => {
+                    alert('❌ Failed to copy. Please select and copy manually.');
+                });
+            }
+        }
+    </script>
+</body>
+</html>

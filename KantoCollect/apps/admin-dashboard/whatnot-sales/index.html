@@ -133,6 +133,23 @@
         <h2>📋 Master Catalog - Assign COGS</h2>
         <p class="muted" style="margin-bottom:16px;">Set default COGS for each product. These values will be used when creating COGS mapping rules.</p>
 
+        <!-- Add New Item Section -->
+        <div style="background:#0f172a; padding:20px; border-radius:8px; border:1px solid #1f2937; margin-bottom:24px;">
+          <h3 style="margin:0 0 16px 0; font-size:16px;">➕ Add New Item to Catalog</h3>
+          <div style="display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end;">
+            <div>
+              <label style="display:block; margin-bottom:6px; font-size:13px; color:#94a3b8;">Image URL from ImageKit</label>
+              <input id="newCatalogImageUrl" type="text"
+                     placeholder="Paste image URL here (e.g., https://ik.imagekit.io/homecraft/Item%20Pics/...)"
+                     style="width:100%; padding:10px; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#e2e8f0; font-size:13px;" />
+            </div>
+            <button onclick="addCatalogItem()" style="padding:10px 24px; white-space:nowrap;">
+              ➕ Add to Catalog
+            </button>
+          </div>
+          <div id="addCatalogMessage" style="margin-top:12px; font-size:13px;"></div>
+        </div>
+
         <!-- Save Button -->
         <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
           <div class="muted" style="font-size:12px;">Enter COGS values and click Save All to update the catalog</div>
@@ -151,11 +168,12 @@
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">Revenue</th>
                 <th style="padding:12px 8px; font-weight:600;">Keywords</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">COGS ($)</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:center; width:80px;">Actions</th>
               </tr>
             </thead>
             <tbody id="catalogTableBody">
               <tr>
-                <td colspan="7" style="padding:20px; text-align:center;" class="muted">Loading master catalog...</td>
+                <td colspan="8" style="padding:20px; text-align:center;" class="muted">Loading master catalog...</td>
               </tr>
             </tbody>
           </table>
@@ -1328,7 +1346,7 @@
 
         if (!res.ok) {
           const error = await res.json();
-          tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center;" class="danger">❌ Error loading products: ${error.detail || res.statusText}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="8" style="padding:20px; text-align:center;" class="danger">❌ Error loading products: ${error.detail || res.statusText}</td></tr>`;
           console.error('Product catalog error:', error);
           return;
         }
@@ -1337,7 +1355,7 @@
         console.log('Product catalog loaded:', data);
 
         if (!data.products || data.products.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center;" class="warning">⚠ No products found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center;" class="warning">⚠ No products found</td></tr>';
           return;
         }
 
@@ -1383,11 +1401,18 @@
                      data-keywords='${JSON.stringify(p.keywords)}'
                      style="width:90px; text-align:right; padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
             </td>
+            <td style="padding:12px 8px; text-align:center;">
+              <button onclick="deleteCatalogItem(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
+                      style="padding:6px 12px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
+                      title="Delete ${p.name}">
+                🗑️
+              </button>
+            </td>
           </tr>
         `).join('');
 
       } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="7" style="padding:20px; text-align:center;" class="danger">❌ Error: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:20px; text-align:center;" class="danger">❌ Error: ${error.message}</td></tr>`;
         console.error('Failed to load catalog:', error);
       }
     }
@@ -1451,6 +1476,81 @@
       } finally {
         saveBtn.disabled = false;
         saveBtn.textContent = '💾 Save All COGS';
+      }
+    }
+
+    // Add new item to catalog
+    async function addCatalogItem() {
+      const urlInput = document.getElementById('newCatalogImageUrl');
+      const messageEl = document.getElementById('addCatalogMessage');
+      const imageUrl = urlInput.value.trim();
+
+      if (!imageUrl) {
+        messageEl.innerHTML = '<span class="warning">⚠ Please paste an image URL</span>';
+        return;
+      }
+
+      messageEl.innerHTML = '<span class="muted">Adding item...</span>';
+
+      try {
+        const res = await fetch(`${apiBase}/product-catalog/add`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ image_url: imageUrl })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+
+          // Check if it's a duplicate error (400 status)
+          if (res.status === 400 && error.detail && error.detail.includes('Duplicate item')) {
+            messageEl.innerHTML = `<span class="warning">⚠️ ${error.detail}</span>`;
+            return;
+          }
+
+          throw new Error(error.detail || 'Failed to add item');
+        }
+
+        const item = await res.json();
+
+        messageEl.innerHTML = `<span class="success">✅ Added: ${item.name} (${item.category})</span>`;
+        urlInput.value = '';
+
+        // Reload catalog
+        setTimeout(() => {
+          loadMasterCatalog();
+          messageEl.innerHTML = '';
+        }, 2000);
+
+      } catch (error) {
+        messageEl.innerHTML = `<span class="warning">❌ Error: ${error.message}</span>`;
+      }
+    }
+
+    // Delete item from catalog
+    async function deleteCatalogItem(itemId, itemName) {
+      if (!confirm(`Are you sure you want to delete "${itemName}" from the catalog?\n\nThis will only remove it from the Master Catalog. Existing COGS rules will not be affected.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${apiBase}/product-catalog/${itemId}`, {
+          method: 'DELETE',
+          headers: authHeaders()
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to delete item');
+        }
+
+        // Reload catalog
+        await loadMasterCatalog();
+
+      } catch (error) {
+        alert(`Error deleting item: ${error.message}`);
       }
     }
 
