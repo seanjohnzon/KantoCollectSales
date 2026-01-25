@@ -108,6 +108,7 @@
       <div class="tab" onclick="showTab('marketplace')">🛒 Marketplace</div>
       <div class="tab" onclick="showTab('products')">📦 Products</div>
       <div class="tab" onclick="showTab('buyers')">👥 Buyers</div>
+      <div class="tab" onclick="showTab('owners')">👤 Owners</div>
     </div>
 
     <!-- IMPORT TAB -->
@@ -325,9 +326,22 @@
           </div>
         </div>
 
-        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
           <h3 style="margin:0;">Transactions</h3>
-          <button onclick="saveAllCOGS()" id="saveCOGSBtn">💾 Save All COGS Changes</button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <div id="assignOwnerSection" style="display:flex; gap:8px; align-items:center;">
+              <span class="muted" style="font-size:13px;">Assign to entire show:</span>
+              <select id="showOwnerSelect" style="padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;">
+                <option value="">Select Owner</option>
+                <option value="Cihan">Cihan</option>
+                <option value="Nima">Nima</option>
+                <option value="Askar">Askar</option>
+                <option value="Kanto">Kanto</option>
+              </select>
+              <button onclick="assignOwnerToShow()" class="secondary" style="white-space:nowrap;">Assign Owner</button>
+            </div>
+            <button onclick="saveAllCOGS()" id="saveCOGSBtn">💾 Save COGS</button>
+          </div>
         </div>
 
         <!-- Transactions Table -->
@@ -343,12 +357,24 @@
                 <th style="padding:12px 8px; text-align:right;">COGS</th>
                 <th style="padding:12px 8px; text-align:right;">Profit</th>
                 <th style="padding:12px 8px; text-align:right;">ROI%</th>
+                <th style="padding:12px 8px;">Owner</th>
               </tr>
             </thead>
             <tbody id="transactionsTableBody">
               <!-- Populated by JavaScript -->
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div id="showPaginationControls" style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:16px; padding:16px;">
+          <button id="showPrevBtn" onclick="previousShowPage()" style="padding:8px 16px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer;">
+            ← Previous
+          </button>
+          <span id="showPageInfo" style="color:#94a3b8; font-size:14px;">Page 1 of 1</span>
+          <button id="showNextBtn" onclick="nextShowPage()" style="padding:8px 16px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer;">
+            Next →
+          </button>
         </div>
       </div>
     </div>
@@ -407,11 +433,12 @@
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">Avg COGS</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">Total Profit</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">Avg ROI%</th>
+                <th style="padding:12px 8px; font-weight:600;">Owner</th>
               </tr>
             </thead>
             <tbody id="marketplaceTableBody">
               <tr>
-                <td colspan="9" style="padding:20px; text-align:center;" class="muted">Loading marketplace orders...</td>
+                <td colspan="10" style="padding:20px; text-align:center;" class="muted">Loading marketplace orders...</td>
               </tr>
             </tbody>
             <tfoot id="marketplaceTableFooter" style="background:#1f2937; border-top:2px solid #22c55e; font-weight:600;">
@@ -448,6 +475,57 @@
           <button class="secondary" onclick="loadBuyers(true)">Repeat Buyers Only</button>
         </div>
         <div id="buyersList" class="grid"></div>
+      </div>
+    </div>
+
+    <!-- OWNERS TAB -->
+    <div id="owners-tab" class="tab-content">
+      <div class="card">
+        <h2>👤 Ownership Management</h2>
+        <p class="muted">View and manage transaction ownership assignments</p>
+
+        <!-- Owner Summary Cards -->
+        <div id="ownersSummary" class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:12px; margin-bottom:24px;">
+          <!-- Summary cards will be populated here -->
+        </div>
+
+        <!-- Transactions by Owner -->
+        <div style="margin-top:24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0;">Transactions</h3>
+            <select id="ownerFilter" onchange="loadOwnerTransactions()" style="padding:8px 12px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px;">
+              <option value="all">All Owners</option>
+              <option value="Cihan">Cihan</option>
+              <option value="Nima">Nima</option>
+              <option value="Askar">Askar</option>
+              <option value="Kanto">Kanto</option>
+              <option value="Unassigned">Unassigned</option>
+            </select>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+              <thead>
+                <tr style="background:#1f2937; text-align:left; border-bottom:2px solid #22c55e;">
+                  <th style="padding:12px 8px; font-weight:600;">Date</th>
+                  <th style="padding:12px 8px; font-weight:600;">Item</th>
+                  <th style="padding:12px 8px; font-weight:600;">Source</th>
+                  <th style="padding:12px 8px; font-weight:600; text-align:right;">Revenue</th>
+                  <th style="padding:12px 8px; font-weight:600; text-align:right;">Earnings</th>
+                  <th style="padding:12px 8px; font-weight:600; text-align:right;">COGS</th>
+                  <th style="padding:12px 8px; font-weight:600; text-align:right;">Profit</th>
+                  <th style="padding:12px 8px; font-weight:600;">Owner</th>
+                  <th style="padding:12px 8px; font-weight:600;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="ownerTransactionsBody">
+                <tr>
+                  <td colspan="9" style="padding:20px; text-align:center;" class="muted">Loading...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -569,6 +647,10 @@
       const keywordsHeader = document.getElementById('keywords-header');
       if (keywordsHeader) keywordsHeader.style.display = adminEnabled ? 'table-cell' : 'none';
 
+      // Show/hide Owner assignment section in Shows tab
+      const assignOwnerSection = document.getElementById('assignOwnerSection');
+      if (assignOwnerSection) assignOwnerSection.style.display = adminEnabled ? 'flex' : 'none';
+
       // Hide/show all edit buttons and input fields
       // HIDE (not disable) all text/number inputs for non-admins
       document.querySelectorAll('input[type="number"], input[type="text"], textarea, select').forEach(input => {
@@ -589,8 +671,15 @@
         // Skip admin enable/disable buttons
         if (btn.id === 'enableBtn' || btn.id === 'disableBtn') return;
 
-        // Hide buttons that modify data (create, save, upload, delete, edit, apply, add, update, remove, import)
+        // Skip pagination buttons
+        if (btn.id === 'showPrevBtn' || btn.id === 'showNextBtn') return;
+
+        // Skip view/navigation buttons (check button text for view-only operations)
         const text = btn.textContent.toLowerCase();
+        if (text.includes('view') || text.includes('go to') || text.includes('back to') ||
+            text.includes('next') || text.includes('previous') || text.includes('load more')) return;
+
+        // Hide buttons that modify data (create, save, upload, delete, edit, apply, add, update, remove, import)
         const isEditButton = text.includes('save') || text.includes('upload') ||
                             text.includes('create') || text.includes('add') ||
                             text.includes('delete') || text.includes('remove') ||
@@ -625,14 +714,18 @@
       });
 
       // Reload current tab to update button visibility
-      const activeTab = document.querySelector('.tab.active');
-      if (activeTab) {
-        const tabName = activeTab.getAttribute('onclick').match(/showTab\('([^']+)'\)/)[1];
-        if (tabName === 'master-catalog') loadMasterCatalog();
-        else if (tabName === 'cogs-rules') loadCOGSRules();
-        else if (tabName === 'marketplace') loadMarketplace();
-        else if (tabName === 'products') loadProducts();
-        else if (tabName === 'analytics') loadAnalytics();
+      try {
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab) {
+          const tabName = activeTab.getAttribute('onclick').match(/showTab\('([^']+)'\)/)[1];
+          if (tabName === 'master-catalog') loadMasterCatalog();
+          else if (tabName === 'cogs-rules') loadCOGSRules();
+          else if (tabName === 'marketplace') loadMarketplace();
+          else if (tabName === 'products') loadProducts();
+          else if (tabName === 'analytics') loadAnalytics();
+        }
+      } catch (error) {
+        console.error('Error reloading tab:', error);
       }
     }
 
@@ -655,6 +748,7 @@
       if (tabName === 'marketplace') loadMarketplace();
       if (tabName === 'products') loadProducts();
       if (tabName === 'buyers') loadBuyers();
+      if (tabName === 'owners') loadOwners();
       if (tabName === 'analytics') loadAnalytics();
     }
 
@@ -1157,23 +1251,38 @@
 
     // Show Detail View Functions
     let currentShowTransactions = [];
+    let currentShowId = null;
 
-    async function viewShowDetail(showId) {
+    let currentShowPage = 1;
+    const showTransactionsPerPage = 100;
+
+    async function viewShowDetail(showId, page = 1) {
       try {
+        // Store current show ID for owner assignment
+        currentShowId = showId;
+        currentShowPage = page;
+
         // Fetch show details
         const showRes = await fetch(`${apiBase}/shows/${showId}`, { headers: authHeaders() });
         const show = await showRes.json();
 
-        // Fetch transactions for this show
-        const transRes = await fetch(`${apiBase}/transactions?show_id=${showId}&limit=500`, { headers: authHeaders() });
-        const transactions = await transRes.json();
-        currentShowTransactions = transactions;
+        // Fetch ALL transactions for this show to get total count
+        const allTransRes = await fetch(`${apiBase}/transactions?show_id=${showId}&limit=10000`, { headers: authHeaders() });
+        const allTransactions = await allTransRes.json();
+        currentShowTransactions = allTransactions;
+
+        // Calculate pagination
+        const totalTransactions = allTransactions.length;
+        const totalPages = Math.ceil(totalTransactions / showTransactionsPerPage);
+        const startIdx = (page - 1) * showTransactionsPerPage;
+        const endIdx = startIdx + showTransactionsPerPage;
+        const transactions = allTransactions.slice(startIdx, endIdx);
 
         // Update header
         const date = new Date(show.show_date);
         const dateStr = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
         document.getElementById('showDetailTitle').textContent = `🎬 ${show.show_name}`;
-        document.getElementById('showDetailMeta').textContent = `${dateStr} • ${transactions.length} transactions`;
+        document.getElementById('showDetailMeta').textContent = `${dateStr} • ${totalTransactions} transactions (Page ${page} of ${totalPages})`;
 
         // Update summary stats
         const revenue = parseFloat(show.total_gross_sales || 0);
@@ -1220,9 +1329,38 @@
               </td>
               <td id="profit-${index}" style="padding:12px 8px; text-align:right; font-weight:600; color:${profitColor};">$${profit.toFixed(2)}</td>
               <td id="roi-${index}" style="padding:12px 8px; text-align:right; font-weight:600; color:${roiColor};">${roi}${roi !== 'N/A' ? '%' : ''}</td>
+              <td style="padding:12px 8px;">
+                ${adminEnabled ? `
+                  <div style="display:flex; gap:4px; align-items:center;">
+                    <select id="owner-show-${t.id}"
+                            style="flex:1; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;">
+                      <option value="" ${!t.owner ? 'selected' : ''}>Unassigned</option>
+                      <option value="Cihan" ${t.owner === 'Cihan' ? 'selected' : ''}>Cihan</option>
+                      <option value="Nima" ${t.owner === 'Nima' ? 'selected' : ''}>Nima</option>
+                      <option value="Askar" ${t.owner === 'Askar' ? 'selected' : ''}>Askar</option>
+                      <option value="Kanto" ${t.owner === 'Kanto' ? 'selected' : ''}>Kanto</option>
+                    </select>
+                    <button onclick="assignOwner(${t.id}, document.getElementById('owner-show-${t.id}').value)"
+                            style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px; white-space:nowrap;">
+                      Apply
+                    </button>
+                  </div>
+                ` : `
+                  <div style="font-size:12px;">${t.owner || 'Unassigned'}</div>
+                `}
+              </td>
             </tr>
           `;
         }).join('');
+
+        // Update pagination controls
+        document.getElementById('showPageInfo').textContent = `Page ${page} of ${totalPages}`;
+        document.getElementById('showPrevBtn').disabled = page === 1;
+        document.getElementById('showNextBtn').disabled = page === totalPages;
+        document.getElementById('showPrevBtn').style.opacity = page === 1 ? '0.5' : '1';
+        document.getElementById('showNextBtn').style.opacity = page === totalPages ? '0.5' : '1';
+        document.getElementById('showPrevBtn').style.cursor = page === 1 ? 'not-allowed' : 'pointer';
+        document.getElementById('showNextBtn').style.cursor = page === totalPages ? 'not-allowed' : 'pointer';
 
         // Hide shows list, show detail view
         document.getElementById('shows-list-view').style.display = 'none';
@@ -1233,9 +1371,23 @@
       }
     }
 
+    function previousShowPage() {
+      if (currentShowPage > 1) {
+        viewShowDetail(currentShowId, currentShowPage - 1);
+      }
+    }
+
+    function nextShowPage() {
+      const totalPages = Math.ceil(currentShowTransactions.length / showTransactionsPerPage);
+      if (currentShowPage < totalPages) {
+        viewShowDetail(currentShowId, currentShowPage + 1);
+      }
+    }
+
     function backToShowsList() {
       document.getElementById('show-detail-view').style.display = 'none';
       document.getElementById('shows-list-view').style.display = 'block';
+      currentShowPage = 1; // Reset pagination
       loadShows(); // Refresh the shows list
     }
 
@@ -2713,6 +2865,26 @@
                 </td>
                 <td id="marketplace-profit-${currentOrderIndex}" style="padding:12px 8px; text-align:right; font-weight:600; color:${singleProfitColor};">$${singleProfit.toFixed(2)}</td>
                 <td id="marketplace-roi-${currentOrderIndex}" style="padding:12px 8px; text-align:right; font-weight:600; color:${singleROIColor};">${singleROI}${singleROI !== 'N/A' ? '%' : ''}</td>
+                <td style="padding:12px 8px;">
+                  ${adminEnabled ? `
+                    <div style="display:flex; gap:4px; align-items:center;">
+                      <select id="owner-${singleOrder.id}"
+                              style="flex:1; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;">
+                        <option value="" ${!singleOrder.owner ? 'selected' : ''}>Unassigned</option>
+                        <option value="Cihan" ${singleOrder.owner === 'Cihan' ? 'selected' : ''}>Cihan</option>
+                        <option value="Nima" ${singleOrder.owner === 'Nima' ? 'selected' : ''}>Nima</option>
+                        <option value="Askar" ${singleOrder.owner === 'Askar' ? 'selected' : ''}>Askar</option>
+                        <option value="Kanto" ${singleOrder.owner === 'Kanto' ? 'selected' : ''}>Kanto</option>
+                      </select>
+                      <button onclick="assignOwner(${singleOrder.id}, document.getElementById('owner-${singleOrder.id}').value)"
+                              style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px; white-space:nowrap;">
+                        Apply
+                      </button>
+                    </div>
+                  ` : `
+                    <div style="font-size:12px;">${singleOrder.owner || 'Unassigned'}</div>
+                  `}
+                </td>
               </tr>
             `);
           } else {
@@ -2736,6 +2908,7 @@
                 <td style="padding:12px 8px; text-align:right;" class="muted">${cogs > 0 ? `$${avgCOGS.toFixed(2)}` : '-'}</td>
                 <td style="padding:12px 8px; text-align:right; font-weight:600; color:${profitColor};">$${profit.toFixed(2)}</td>
                 <td style="padding:12px 8px; text-align:right; font-weight:600; color:${roiColor};">${avgROI}${avgROI !== 'N/A' ? '%' : ''}</td>
+                <td style="padding:12px 8px;" class="muted">-</td>
               </tr>
             `);
           }
@@ -2782,6 +2955,26 @@
                     </td>
                     <td id="marketplace-profit-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderProfitColor};">$${orderProfit.toFixed(2)}</td>
                     <td id="marketplace-roi-${currentOrderIndex}" style="padding:8px; text-align:right; font-size:12px; color:${orderROIColor};">${orderROI}${orderROI !== 'N/A' ? '%' : ''}</td>
+                    <td style="padding:8px;">
+                      ${adminEnabled ? `
+                        <div style="display:flex; gap:4px; align-items:center;">
+                          <select id="owner-detail-${order.id}"
+                                  style="flex:1; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:11px;">
+                            <option value="" ${!order.owner ? 'selected' : ''}>Unassigned</option>
+                            <option value="Cihan" ${order.owner === 'Cihan' ? 'selected' : ''}>Cihan</option>
+                            <option value="Nima" ${order.owner === 'Nima' ? 'selected' : ''}>Nima</option>
+                            <option value="Askar" ${order.owner === 'Askar' ? 'selected' : ''}>Askar</option>
+                            <option value="Kanto" ${order.owner === 'Kanto' ? 'selected' : ''}>Kanto</option>
+                          </select>
+                          <button onclick="assignOwner(${order.id}, document.getElementById('owner-detail-${order.id}').value)"
+                                  style="padding:4px 6px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; white-space:nowrap;">
+                            Apply
+                          </button>
+                        </div>
+                      ` : `
+                        <div style="font-size:11px;">${order.owner || 'Unassigned'}</div>
+                      `}
+                    </td>
                   </tr>
                 `);
               });
@@ -2807,6 +3000,7 @@
             <td style="padding:12px 8px; text-align:right;">$${totalCOGS.toFixed(2)}</td>
             <td style="padding:12px 8px; text-align:right; font-weight:600; color:${totalProfit > 0 ? '#22c55e' : '#ef4444'};">$${totalProfit.toFixed(2)}</td>
             <td style="padding:12px 8px; text-align:right; font-weight:600; color:${avgTotalROI !== 'N/A' ? '#22c55e' : '#94a3b8'};">${avgTotalROI}${avgTotalROI !== 'N/A' ? '%' : ''}</td>
+            <td style="padding:12px 8px;"></td>
           </tr>
         `;
 
@@ -2906,6 +3100,258 @@
       } finally {
         saveBtn.disabled = false;
         saveBtn.textContent = '💾 Save All COGS Changes';
+      }
+    }
+
+    // === OWNER MANAGEMENT FUNCTIONS ===
+
+    async function loadOwners() {
+      try {
+        // Load owner summary
+        const summaryRes = await fetch(`${apiBase}/owners/summary`, { headers: authHeaders() });
+        const summaryData = await summaryRes.json();
+
+        const summaryEl = document.getElementById('ownersSummary');
+        summaryEl.innerHTML = summaryData.owners.map(owner => {
+          const profitColor = owner.total_profit > 0 ? '#22c55e' : owner.total_profit < 0 ? '#ef4444' : '#94a3b8';
+          const iconMap = {
+            'Cihan': '👤',
+            'Nima': '👤',
+            'Askar': '👤',
+            'Kanto': '👤',
+            'Unassigned': '❓'
+          };
+          const icon = iconMap[owner.owner] || '👤';
+
+          return `
+            <div class="card" style="padding:16px; cursor:pointer; transition:background 0.2s;"
+                 onmouseover="this.style.background='#1f2937'"
+                 onmouseout="this.style.background='#111827'"
+                 onclick="filterByOwner('${owner.owner}')">
+              <div style="font-size:24px; margin-bottom:8px;">${icon}</div>
+              <div style="font-weight:600; font-size:16px; margin-bottom:8px;">${owner.owner}</div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span class="muted" style="font-size:12px;">Transactions:</span>
+                <span style="font-weight:600;">${owner.transaction_count}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span class="muted" style="font-size:12px;">Revenue:</span>
+                <span style="font-weight:600;">$${owner.total_revenue.toFixed(2)}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span class="muted" style="font-size:12px;">Earnings:</span>
+                <span style="font-weight:600; color:#22c55e;">$${owner.total_earnings.toFixed(2)}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span class="muted" style="font-size:12px;">COGS:</span>
+                <span style="font-weight:600;">$${owner.total_cogs.toFixed(2)}</span>
+              </div>
+              ${owner.total_cogs > 0 ? `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span class="muted" style="font-size:12px;">Profit:</span>
+                  <span style="font-weight:600; color:${profitColor};">$${owner.total_profit.toFixed(2)}</span>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+
+        // Load transactions for selected owner filter
+        loadOwnerTransactions();
+
+      } catch (error) {
+        console.error('Failed to load owners:', error);
+        document.getElementById('ownersSummary').innerHTML = '<div class="danger">Failed to load owners data</div>';
+      }
+    }
+
+    async function loadOwnerTransactions() {
+      const filter = document.getElementById('ownerFilter').value;
+      const tbody = document.getElementById('ownerTransactionsBody');
+
+      try {
+        let transactions = [];
+
+        if (filter === 'all') {
+          // Load all owners and combine transactions
+          const summaryRes = await fetch(`${apiBase}/owners/summary`, { headers: authHeaders() });
+          if (!summaryRes.ok) throw new Error('Failed to load owners summary');
+          const summaryData = await summaryRes.json();
+
+          for (const owner of summaryData.owners) {
+            const ownerName = owner.owner === 'Unassigned' ? 'Unassigned' : owner.owner;
+            const res = await fetch(`${apiBase}/owners/${ownerName}/transactions?limit=1000`, { headers: authHeaders() });
+            if (!res.ok) {
+              console.error(`Failed to load ${ownerName} transactions:`, res.status);
+              continue;
+            }
+            const data = await res.json();
+            transactions.push(...data.transactions);
+          }
+        } else {
+          const res = await fetch(`${apiBase}/owners/${filter}/transactions?limit=1000`, { headers: authHeaders() });
+          if (!res.ok) throw new Error(`Failed to load transactions for ${filter}`);
+          const data = await res.json();
+          transactions = data.transactions;
+        }
+
+        if (transactions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="muted">No transactions found</td></tr>';
+          return;
+        }
+
+        // Sort by date descending
+        transactions.sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date));
+
+        tbody.innerHTML = transactions.map(t => {
+          const date = new Date(t.transaction_date).toLocaleDateString();
+          const revenue = parseFloat(t.total_revenue || t.gross_sale_price || 0);
+          const earnings = parseFloat(t.net_earnings || 0);
+          const cogs = parseFloat(t.cogs || 0);
+          const profit = cogs > 0 ? earnings - cogs : 0;
+          const profitColor = profit > 0 ? '#22c55e' : profit < 0 ? '#ef4444' : '#94a3b8';
+          const source = t.sale_type === 'marketplace' ? '🛒 Marketplace' : `🎬 ${t.show_name || 'Show #' + t.show_id}`;
+
+          return `
+            <tr style="border-bottom:1px solid #1f2937;">
+              <td style="padding:12px 8px;">${date}</td>
+              <td style="padding:12px 8px;">${t.item_name}</td>
+              <td style="padding:12px 8px; color:#64748b; font-size:12px;">${source}</td>
+              <td style="padding:12px 8px; text-align:right;">$${revenue.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right; color:#22c55e;">$${earnings.toFixed(2)}</td>
+              <td style="padding:12px 8px; text-align:right;">${cogs > 0 ? '$' + cogs.toFixed(2) : '-'}</td>
+              <td style="padding:12px 8px; text-align:right; color:${profitColor};">${profit !== 0 ? '$' + profit.toFixed(2) : '-'}</td>
+              <td style="padding:12px 8px;">
+                ${adminEnabled ? `
+                  <div style="display:flex; gap:4px; align-items:center;">
+                    <select id="owner-owners-${t.id}"
+                            style="flex:1; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;">
+                      <option value="" ${!t.owner ? 'selected' : ''}>Unassigned</option>
+                      <option value="Cihan" ${t.owner === 'Cihan' ? 'selected' : ''}>Cihan</option>
+                      <option value="Nima" ${t.owner === 'Nima' ? 'selected' : ''}>Nima</option>
+                      <option value="Askar" ${t.owner === 'Askar' ? 'selected' : ''}>Askar</option>
+                      <option value="Kanto" ${t.owner === 'Kanto' ? 'selected' : ''}>Kanto</option>
+                    </select>
+                    <button onclick="assignOwner(${t.id}, document.getElementById('owner-owners-${t.id}').value)"
+                            style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px; white-space:nowrap;">
+                      Apply
+                    </button>
+                  </div>
+                ` : `
+                  <div style="font-size:12px;">${t.owner || 'Unassigned'}</div>
+                `}
+              </td>
+              <td style="padding:12px 8px;">
+                ${t.sale_type === 'marketplace' ? `
+                  <button onclick="showTab('marketplace')"
+                          style="padding:6px 12px; background:#22c55e; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px; white-space:nowrap;">
+                    Go to Marketplace
+                  </button>
+                ` : t.show_id ? `
+                  <button onclick="showTab('shows'); setTimeout(() => viewShowDetail(${t.show_id}), 100)"
+                          style="padding:6px 12px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px; white-space:nowrap;">
+                    Go to Show
+                  </button>
+                ` : '-'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (error) {
+        console.error('Failed to load owner transactions:', error);
+        tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="danger">Failed to load transactions</td></tr>';
+      }
+    }
+
+    function filterByOwner(owner) {
+      const filterEl = document.getElementById('ownerFilter');
+      filterEl.value = owner;
+      loadOwnerTransactions();
+    }
+
+    async function assignOwner(transactionId, owner) {
+      try {
+        console.log('Assigning owner:', { transactionId, owner });
+
+        const res = await fetch(`${apiBase}/transactions/${transactionId}/owner`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(owner || null),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ detail: res.statusText }));
+          throw new Error(errorData.detail || 'Failed to assign owner');
+        }
+
+        const result = await res.json();
+        console.log('Owner assigned successfully:', result);
+
+        // Reload the current active tab to show updated owner
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab) {
+          const onclickAttr = activeTab.getAttribute('onclick');
+          if (onclickAttr.includes('owners')) {
+            loadOwners();
+          } else if (onclickAttr.includes('marketplace')) {
+            loadMarketplace();
+          } else if (onclickAttr.includes('shows')) {
+            // If we're in a show detail view, reload that show
+            if (currentShowId) {
+              viewShowDetail(currentShowId);
+            } else {
+              loadShows();
+            }
+          }
+        }
+
+      } catch (error) {
+        console.error('Failed to assign owner:', error);
+        alert('Failed to assign owner: ' + error.message);
+      }
+    }
+
+    async function assignOwnerToShow() {
+      const owner = document.getElementById('showOwnerSelect').value;
+      if (!owner) {
+        alert('Please select an owner');
+        return;
+      }
+
+      if (!currentShowId) {
+        alert('No show selected');
+        return;
+      }
+
+      if (!confirm(`Assign all transactions in this show to ${owner}?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${apiBase}/shows/${currentShowId}/owner`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(owner),
+        });
+
+        if (!res.ok) throw new Error('Failed to assign owner to show');
+
+        const result = await res.json();
+        alert(`✅ Assigned ${result.transactions_updated} transactions to ${owner}`);
+
+        // Reload show details
+        viewShowDetail(currentShowId);
+
+      } catch (error) {
+        console.error('Failed to assign owner to show:', error);
+        alert('Failed to assign owner to show: ' + error.message);
       }
     }
 

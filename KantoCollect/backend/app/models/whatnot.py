@@ -30,6 +30,14 @@ class CatalogRuleType(str, Enum):
     CATCH_ALL = "catch_all"  # Catches anything that doesn't match other items (for "Unmapped Items")
 
 
+class Owner(str, Enum):
+    """Transaction owner assignment."""
+    CIHAN = "Cihan"
+    NIMA = "Nima"
+    ASKAR = "Askar"
+    KANTO = "Kanto"
+
+
 # === DATABASE MODELS ===
 
 class WhatnotShow(SQLModel, table=True):
@@ -121,6 +129,9 @@ class SalesTransaction(SQLModel, table=True):
     is_mapped: bool = Field(default=False, index=True)  # Quick filter for mapped vs unmapped
     matched_keyword: Optional[str] = None  # Which keyword caused the match
     mapped_at: Optional[datetime] = None  # When it was mapped
+
+    # Owner assignment
+    owner: Optional[str] = Field(default=None, index=True)  # One of: Cihan, Nima, Askar, Kanto
 
     # Metadata
     row_number: Optional[int] = None
@@ -329,6 +340,7 @@ class TransactionRead(SQLModel):
     """Read schema for transaction."""
     id: int
     show_id: Optional[int]  # Nullable for marketplace orders
+    show_name: Optional[str] = None  # Show name (populated from related show)
     sale_type: str  # 'stream' or 'marketplace'
     transaction_date: datetime
     item_name: str
@@ -343,6 +355,7 @@ class TransactionRead(SQLModel):
     net_profit: Optional[Decimal]
     roi_percent: Optional[Decimal]
     matched_cogs_rule_id: Optional[int]
+    owner: Optional[str]  # Owner assignment (Cihan, Nima, Askar, Kanto)
 
 
 class TransactionUpdate(SQLModel):

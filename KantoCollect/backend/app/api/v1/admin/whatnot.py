@@ -62,9 +62,19 @@ def _to_show_read(show: WhatnotShow) -> ShowRead:
     return ShowRead.model_validate(show)
 
 
-def _to_transaction_read(transaction: SalesTransaction) -> TransactionRead:
+def _to_transaction_read(transaction: SalesTransaction, db: Session = None) -> TransactionRead:
     """Convert transaction model to read schema."""
-    return TransactionRead.model_validate(transaction)
+    # Create base transaction data
+    data = transaction.model_dump()
+
+    # Populate show_name if show_id exists
+    if transaction.show_id and db:
+        show = db.get(WhatnotShow, transaction.show_id)
+        data['show_name'] = show.show_name if show else None
+    else:
+        data['show_name'] = None
+
+    return TransactionRead(**data)
 
 
 def _to_product_read(product: WhatnotProduct) -> ProductRead:
@@ -282,7 +292,7 @@ async def list_transactions(
             query = query.where(SalesTransaction.cogs.is_(None))
 
     transactions = db.exec(query.offset(offset).limit(limit)).all()
-    return [_to_transaction_read(t) for t in transactions]
+    return [_to_transaction_read(t, db) for t in transactions]
 
 
 @router.get("/transactions/{transaction_id}", response_model=TransactionRead)
@@ -295,7 +305,7 @@ async def get_transaction(
     transaction = db.get(SalesTransaction, transaction_id)
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    return _to_transaction_read(transaction)
+    return _to_transaction_read(transaction, db)
 
 
 @router.put("/transactions/{transaction_id}", response_model=TransactionRead)
@@ -331,7 +341,7 @@ async def update_transaction(
     db.add(transaction)
     db.commit()
     db.refresh(transaction)
-    return _to_transaction_read(transaction)
+    return _to_transaction_read(transaction, db)
 
 
 @router.post("/transactions/{transaction_id}/recalculate-cogs", response_model=TransactionRead)
@@ -349,7 +359,171 @@ async def recalculate_cogs(
     recalculate_transaction_cogs(db, transaction)
     db.commit()
     db.refresh(transaction)
-    return _to_transaction_read(transaction)
+    return _to_transaction_read(transaction, db)
+
+
+# === OWNER ASSIGNMENT ENDPOINTS ===
+
+@router.put("/transactions/{transaction_id}/owner")
+async def assign_owner_to_transaction(
+    transaction_id: int,
+    owner: Optional[str] = Body(None),
+    current_user: AdminUser = None,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """Assign owner to a single transaction."""
+    transaction = db.get(SalesTransaction, transaction_id)
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Validate owner value
+    valid_owners = ["Cihan", "Nima", "Askar", "Kanto", None]
+    if owner not in valid_owners:
+        raise HTTPException(status_code=400, detail=f"Invalid owner. Must be one of: {valid_owners}")
+
+    transaction.owner = owner
+    db.add(transaction)
+    db.commit()
+
+    return {"success": True, "transaction_id": transaction_id, "owner": owner}
+
+
+@router.put("/shows/{show_id}/owner")
+async def assign_owner_to_show(
+    show_id: int,
+    owner: Optional[str] = Body(None),
+    current_user: AdminUser = None,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """Assign owner to all transactions in a show."""
+    show = db.get(WhatnotShow, show_id)
+    if not show:
+        raise HTTPException(status_code=404, detail="Show not found")
+
+    # Validate owner value
+    valid_owners = ["Cihan", "Nima", "Askar", "Kanto", None]
+    if owner not in valid_owners:
+        raise HTTPException(status_code=400, detail=f"Invalid owner. Must be one of: {valid_owners}")
+
+    # Update all transactions for this show
+    transactions = db.exec(
+        select(SalesTransaction).where(SalesTransaction.show_id == show_id)
+    ).all()
+
+    updated_count = 0
+    for transaction in transactions:
+        transaction.owner = owner
+        db.add(transaction)
+        updated_count += 1
+
+    db.commit()
+
+    return {
+        "success": True,
+        "show_id": show_id,
+        "show_name": show.show_name,
+        "owner": owner,
+        "transactions_updated": updated_count
+    }
+
+
+@router.get("/owners/summary")
+async def get_owners_summary(
+    current_user: OptionalUser,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """Get summary of transactions grouped by owner."""
+    # Get all owners and their transaction counts
+    owners_data = {}
+
+    for owner in ["Cihan", "Nima", "Askar", "Kanto"]:
+        transactions = db.exec(
+            select(SalesTransaction).where(SalesTransaction.owner == owner)
+        ).all()
+
+        total_revenue = Decimal("0")
+        total_earnings = Decimal("0")
+        total_cogs = Decimal("0")
+        total_profit = Decimal("0")
+
+        for t in transactions:
+            # Use total_revenue for marketplace, gross_sale_price for shows
+            revenue = t.total_revenue or t.gross_sale_price
+            total_revenue += revenue
+            total_earnings += t.net_earnings or Decimal("0")
+            if t.cogs:
+                total_cogs += t.cogs
+                total_profit += (t.net_earnings - t.cogs)
+
+        owners_data[owner] = {
+            "owner": owner,
+            "transaction_count": len(transactions),
+            "total_revenue": float(total_revenue),
+            "total_earnings": float(total_earnings),
+            "total_cogs": float(total_cogs),
+            "total_profit": float(total_profit),
+        }
+
+    # Get unassigned count
+    unassigned = db.exec(
+        select(SalesTransaction).where(SalesTransaction.owner == None)
+    ).all()
+
+    unassigned_revenue = sum([t.total_revenue or t.gross_sale_price for t in unassigned])
+    unassigned_earnings = sum([t.net_earnings or Decimal("0") for t in unassigned])
+
+    owners_data["Unassigned"] = {
+        "owner": "Unassigned",
+        "transaction_count": len(unassigned),
+        "total_revenue": float(unassigned_revenue),
+        "total_earnings": float(unassigned_earnings),
+        "total_cogs": 0,
+        "total_profit": 0,
+    }
+
+    return {"owners": list(owners_data.values())}
+
+
+@router.get("/owners/{owner}/transactions")
+async def get_owner_transactions(
+    owner: str,
+    current_user: OptionalUser,
+    db: Session = Depends(get_whatnot_db),
+    limit: int = 100,
+    offset: int = 0,
+) -> dict:
+    """Get all transactions for a specific owner."""
+    # Validate owner
+    valid_owners = ["Cihan", "Nima", "Askar", "Kanto", "Unassigned"]
+    if owner not in valid_owners:
+        raise HTTPException(status_code=400, detail=f"Invalid owner. Must be one of: {valid_owners}")
+
+    # Query transactions
+    if owner == "Unassigned":
+        query = select(SalesTransaction).where(SalesTransaction.owner == None)
+    else:
+        query = select(SalesTransaction).where(SalesTransaction.owner == owner)
+
+    query = query.order_by(SalesTransaction.transaction_date.desc())
+
+    # Get total count
+    all_transactions = db.exec(query).all()
+    total_count = len(all_transactions)
+
+    # Apply pagination
+    query = query.offset(offset).limit(limit)
+    transactions = db.exec(query).all()
+
+    # Convert to read format with show names
+    transactions_data = [_to_transaction_read(t, db) for t in transactions]
+
+    return {
+        "owner": owner,
+        "transactions": transactions_data,
+        "total_count": total_count,
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 # === PRODUCT ENDPOINTS ===
