@@ -22,6 +22,14 @@ class MatchType(str, Enum):
     EXACT = "exact"
 
 
+class CatalogRuleType(str, Enum):
+    """Rule type for product catalog keyword matching."""
+    INCLUDE_ANY = "include_any"  # Must contain AT LEAST ONE include keyword
+    INCLUDE_ALL = "include_all"  # Must contain ALL include keywords
+    INCLUDE_AND_EXCLUDE = "include_and_exclude"  # Must have include keywords but NOT exclude keywords
+    CATCH_ALL = "catch_all"  # Catches anything that doesn't match other items (for "Unmapped Items")
+
+
 # === DATABASE MODELS ===
 
 class WhatnotShow(SQLModel, table=True):
@@ -254,7 +262,15 @@ class ProductCatalog(SQLModel, table=True):
     category: str  # UPC, ETB, Booster Bundle, Singles, etc.
     image_url: str  # Full ImageKit URL
     image_filename: str  # Just the filename for reference
-    keywords: List[str] = Field(sa_column=Column(JSON))  # Keywords for matching
+
+    # NEW: Rule-based matching system
+    rule_type: CatalogRuleType = Field(default=CatalogRuleType.INCLUDE_ANY)  # Type of matching rule
+    include_keywords: List[str] = Field(default=[], sa_column=Column(JSON))  # Must contain these keywords
+    exclude_keywords: List[str] = Field(default=[], sa_column=Column(JSON))  # Must NOT contain these keywords
+    priority: int = Field(default=100)  # Higher priority = checked first (for breaking ties)
+
+    # OLD: Keep for backward compatibility during migration
+    keywords: List[str] = Field(default=[], sa_column=Column(JSON))  # DEPRECATED: Use include_keywords instead
 
     # These will be computed from transactions
     sales_count: int = Field(default=0)  # Number of sales matched
@@ -432,7 +448,11 @@ class ProductCatalogRead(SQLModel):
     category: str
     image_url: str
     image_filename: str
-    keywords: List[str]
+    rule_type: CatalogRuleType
+    include_keywords: List[str]
+    exclude_keywords: List[str]
+    priority: int
+    keywords: List[str]  # DEPRECATED: Keep for backward compatibility
     sales_count: int
     total_revenue: Decimal
     created_at: datetime
@@ -447,4 +467,8 @@ class ProductCatalogUpdate(SQLModel):
     """Update schema for product catalog item."""
     name: Optional[str] = None
     category: Optional[str] = None
-    keywords: Optional[List[str]] = None
+    rule_type: Optional[CatalogRuleType] = None
+    include_keywords: Optional[List[str]] = None
+    exclude_keywords: Optional[List[str]] = None
+    priority: Optional[int] = None
+    keywords: Optional[List[str]] = None  # DEPRECATED: Keep for backward compatibility

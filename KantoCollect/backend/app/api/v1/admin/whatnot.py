@@ -659,57 +659,78 @@ async def get_product_catalog(
     current_user: AdminUser,
     db: Session = Depends(get_whatnot_db),
 ) -> dict:
-    """Get product catalog from database."""
-    # Get all catalog items from database
-    catalog_items = db.exec(select(ProductCatalog)).all()
+    """Get product catalog from database with rule-based matching."""
+    from app.models.whatnot import CatalogRuleType
+
+    # Get all catalog items from database (ordered by priority DESC)
+    catalog_items = db.exec(
+        select(ProductCatalog).order_by(ProductCatalog.priority.desc())
+    ).all()
 
     # Get all transactions for matching
     transactions = db.exec(select(SalesTransaction)).all()
 
-    # First pass: For each transaction, find the BEST match (longest/most specific keyword)
-    # This ensures "surging sparks etb + booster bundle" beats "surging sparks etb"
-    # "Unmapped Items" is excluded from normal matching and only catches leftovers
+    # NEW RULE-BASED MATCHING LOGIC
+    # Simple, universal matching that doesn't require constant patching
     transaction_matches = {}  # transaction_id -> catalog_item_id
+    catch_all_item = None
 
+    # Find the CATCH_ALL item (for "Unmapped Items")
+    for catalog_item in catalog_items:
+        if catalog_item.rule_type == CatalogRuleType.CATCH_ALL:
+            catch_all_item = catalog_item
+            break
+
+    # Match each transaction
     for t in transactions:
         item_name_lower = t.item_name.lower()
-        best_match = None
-        best_keyword_length = 0
-        best_is_unmapped = False
+        matched = False
 
+        # Try to match against catalog items (ordered by priority)
         for catalog_item in catalog_items:
-            # Check if this is the "Unmapped Items" catalog
-            is_unmapped = catalog_item.name == "Unmapped Items"
+            # Skip CATCH_ALL items in this pass
+            if catalog_item.rule_type == CatalogRuleType.CATCH_ALL:
+                continue
 
-            for keyword in catalog_item.keywords:
-                keyword_lower = keyword.lower()
-                if keyword_lower in item_name_lower:
-                    keyword_len = len(keyword_lower)
+            match = False
 
-                    # Pick the best match using these rules:
-                    # 1. Longer keyword always wins
-                    # 2. If same length, non-Unmapped Items wins
-                    # 3. If both unmapped or both not unmapped, keep the first match
-                    should_update = False
+            if catalog_item.rule_type == CatalogRuleType.INCLUDE_ALL:
+                # Must contain ALL include keywords
+                match = all(
+                    kw.lower() in item_name_lower
+                    for kw in catalog_item.include_keywords
+                )
 
-                    if keyword_len > best_keyword_length:
-                        # Longer keyword always wins
-                        should_update = True
-                    elif keyword_len == best_keyword_length:
-                        # Same length - prefer non-Unmapped Items
-                        if best_is_unmapped and not is_unmapped:
-                            # Current best is Unmapped, this one isn't - take it
-                            should_update = True
+            elif catalog_item.rule_type == CatalogRuleType.INCLUDE_ANY:
+                # Must contain AT LEAST ONE include keyword
+                match = any(
+                    kw.lower() in item_name_lower
+                    for kw in catalog_item.include_keywords
+                )
 
-                    if should_update:
-                        best_match = catalog_item.id
-                        best_keyword_length = keyword_len
-                        best_is_unmapped = is_unmapped
+            elif catalog_item.rule_type == CatalogRuleType.INCLUDE_AND_EXCLUDE:
+                # Must have include keywords but NOT exclude keywords
+                has_include = any(
+                    kw.lower() in item_name_lower
+                    for kw in catalog_item.include_keywords
+                )
+                has_exclude = any(
+                    kw.lower() in item_name_lower
+                    for kw in catalog_item.exclude_keywords
+                )
+                match = has_include and not has_exclude
 
-        if best_match:
-            transaction_matches[t.id] = best_match
+            # If matched, assign to this catalog item and stop checking
+            if match:
+                transaction_matches[t.id] = catalog_item.id
+                matched = True
+                break
 
-    # Second pass: Count matches for each catalog item
+        # If no match found and we have a CATCH_ALL item, assign to it
+        if not matched and catch_all_item:
+            transaction_matches[t.id] = catch_all_item.id
+
+    # Count matches for each catalog item
     products = []
     for item in catalog_items:
         sales = 0
@@ -726,7 +747,11 @@ async def get_product_catalog(
             "name": item.name,
             "category": item.category,
             "imageUrl": item.image_url,
-            "keywords": item.keywords,
+            "ruleType": item.rule_type,
+            "includeKeywords": item.include_keywords,
+            "excludeKeywords": item.exclude_keywords,
+            "priority": item.priority,
+            "keywords": item.keywords,  # DEPRECATED: Keep for backward compatibility
             "sales": sales,
             "revenue": round(revenue, 2),
             "cogs": None  # For backward compatibility
