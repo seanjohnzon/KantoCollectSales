@@ -364,6 +364,7 @@ class ProductRead(SQLModel):
     default_cogs: Optional[Decimal]
     category: Optional[str]
     master_card_id: Optional[int]
+    has_cogs: Optional[bool] = None
 
 
 class ProductUpdate(SQLModel):

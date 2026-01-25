@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>WhatNot Sales Tracker</title>
   <style>
     * { box-sizing: border-box; }
@@ -432,6 +435,7 @@
           </select>
         </div>
         <div id="productsList" class="grid"></div>
+        <div id="productsPagination" style="margin-top:20px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap;"></div>
       </div>
     </div>
 
@@ -1258,23 +1262,243 @@
     }
 
     // Products
-    async function loadProducts() {
+    let currentProductsPage = 1;
+    const productsPerPage = 50;
+
+    async function loadProducts(page = 1) {
+      currentProductsPage = page;
       const filter = document.getElementById("productFilter").value;
-      let url = `${apiBase}/products?limit=50`;
+      const offset = (page - 1) * productsPerPage;
+      let url = `${apiBase}/products?limit=${productsPerPage}&offset=${offset}`;
       if (filter === 'has_cogs') url += '&has_cogs=true';
       if (filter === 'missing_cogs') url += '&has_cogs=false';
 
       const res = await fetch(url, { headers: authHeaders() });
-      const products = await res.json();
+      const data = await res.json();
+      const products = data.products;
+      const total = data.total;
+
       const container = document.getElementById("productsList");
       container.innerHTML = products.map(p => `
-        <div class="card">
+        <div class="card" style="cursor:pointer;" onclick="showProductTransactions(${p.id}, '${p.product_name.replace(/'/g, "\\'")}')">
           <strong>${p.product_name}</strong><br>
           <div class="muted">Sold ${p.times_sold}x • Avg: $${p.avg_sale_price}</div>
           <div>Total: <strong>$${p.total_gross_sales}</strong></div>
-          ${p.default_cogs ? `<div class="success">COGS: $${p.default_cogs}</div>` : '<div class="warning">⚠ Missing COGS</div>'}
+          ${p.has_cogs ? '<div class="success">✅ Has COGS</div>' : '<div class="warning">⚠ Missing COGS</div>'}
+          <div style="margin-top:8px; font-size:11px; color:#3b82f6;">📋 Click to view transactions</div>
         </div>
       `).join('');
+
+      // Render pagination
+      renderProductsPagination(total, page);
+    }
+
+    function renderProductsPagination(total, currentPage) {
+      const totalPages = Math.ceil(total / productsPerPage);
+      const container = document.getElementById("productsPagination");
+
+      if (totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+      }
+
+      let html = '';
+
+      // Previous button
+      if (currentPage > 1) {
+        html += `<button onclick="loadProducts(${currentPage - 1})" style="padding:8px 12px; background:#334155; color:#e2e8f0; border:none; border-radius:6px; cursor:pointer;">← Prev</button>`;
+      }
+
+      // Page numbers
+      const maxPageButtons = 7;
+      let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+      let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+
+      // Adjust start if we're near the end
+      if (endPage - startPage < maxPageButtons - 1) {
+        startPage = Math.max(1, endPage - maxPageButtons + 1);
+      }
+
+      // First page
+      if (startPage > 1) {
+        html += `<button onclick="loadProducts(1)" style="padding:8px 12px; background:#334155; color:#e2e8f0; border:none; border-radius:6px; cursor:pointer;">1</button>`;
+        if (startPage > 2) {
+          html += `<span style="padding:8px; color:#94a3b8;">...</span>`;
+        }
+      }
+
+      // Page numbers
+      for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === currentPage;
+        html += `<button onclick="loadProducts(${i})" style="padding:8px 12px; background:${isActive ? '#3b82f6' : '#334155'}; color:#e2e8f0; border:none; border-radius:6px; cursor:pointer; font-weight:${isActive ? 'bold' : 'normal'};">${i}</button>`;
+      }
+
+      // Last page
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+          html += `<span style="padding:8px; color:#94a3b8;">...</span>`;
+        }
+        html += `<button onclick="loadProducts(${totalPages})" style="padding:8px 12px; background:#334155; color:#e2e8f0; border:none; border-radius:6px; cursor:pointer;">${totalPages}</button>`;
+      }
+
+      // Next button
+      if (currentPage < totalPages) {
+        html += `<button onclick="loadProducts(${currentPage + 1})" style="padding:8px 12px; background:#334155; color:#e2e8f0; border:none; border-radius:6px; cursor:pointer;">Next →</button>`;
+      }
+
+      html += `<div style="padding:8px; color:#94a3b8; margin-left:12px;">Page ${currentPage} of ${totalPages} (${total} items)</div>`;
+
+      container.innerHTML = html;
+    }
+
+    // Show transactions for a specific product
+    async function showProductTransactions(productId, productName) {
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
+
+      modal.innerHTML = `
+        <div style="background:#0f172a; border:1px solid #1f2937; border-radius:12px; max-width:1200px; width:100%; max-height:90vh; overflow:auto; padding:24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="margin:0; color:#e2e8f0;">Transactions for: ${productName}</h3>
+            <button onclick="this.closest('div').parentElement.parentElement.remove()"
+                    style="background:#334155; color:#e2e8f0; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:14px;">
+              ✕ Close
+            </button>
+          </div>
+          <div id="product-transactions-content">Loading...</div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // Fetch transactions for this product
+      try {
+        const res = await fetch(`${apiBase}/transactions?product_id=${productId}&limit=500`, { headers: authHeaders() });
+        const transactions = await res.json();
+
+        const content = document.getElementById('product-transactions-content');
+
+        if (transactions.length === 0) {
+          content.innerHTML = '<div class="warning">No transactions found</div>';
+          return;
+        }
+
+        // Group by show/marketplace
+        const byShow = {};
+        const marketplace = [];
+
+        transactions.forEach(t => {
+          if (t.sale_type === 'marketplace') {
+            marketplace.push(t);
+          } else if (t.show_id) {
+            if (!byShow[t.show_id]) {
+              byShow[t.show_id] = {
+                show_name: t.show_name || `Show #${t.show_id}`,
+                transactions: []
+              };
+            }
+            byShow[t.show_id].transactions.push(t);
+          }
+        });
+
+        let html = `
+          <div style="margin-bottom:16px; padding:12px; background:#1f2937; border-radius:6px;">
+            <strong>Total Transactions: ${transactions.length}</strong><br>
+            ${Object.keys(byShow).length > 0 ? `Shows: ${Object.keys(byShow).length} • ` : ''}
+            ${marketplace.length > 0 ? `Marketplace: ${marketplace.length}` : ''}
+          </div>
+        `;
+
+        // Show by show
+        Object.values(byShow).forEach(show => {
+          html += `
+            <div style="margin-bottom:20px;">
+              <h4 style="color:#3b82f6; margin:8px 0;">${show.show_name} (${show.transactions.length} transactions)</h4>
+              <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                <thead>
+                  <tr style="border-bottom:1px solid #1f2937;">
+                    <th style="text-align:left; padding:8px; color:#94a3b8;">Date</th>
+                    <th style="text-align:left; padding:8px; color:#94a3b8;">Item Name</th>
+                    <th style="text-align:right; padding:8px; color:#94a3b8;">Qty</th>
+                    <th style="text-align:right; padding:8px; color:#94a3b8;">Price</th>
+                    <th style="text-align:right; padding:8px; color:#94a3b8;">COGS</th>
+                    <th style="text-align:right; padding:8px; color:#94a3b8;">Profit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${show.transactions.map(t => {
+                    const hasCogs = t.cogs && t.cogs > 0;
+                    const cogsColor = hasCogs ? '#22c55e' : '#ef4444';
+                    const profitColor = t.net_profit > 0 ? '#22c55e' : t.net_profit < 0 ? '#ef4444' : '#94a3b8';
+
+                    return `
+                      <tr style="border-bottom:1px solid #1f2937;">
+                        <td style="padding:8px; color:#e2e8f0;">${new Date(t.transaction_date).toLocaleDateString()}</td>
+                        <td style="padding:8px; color:#e2e8f0;">${t.item_name.length > 50 ? t.item_name.substring(0, 50) + '...' : t.item_name}</td>
+                        <td style="padding:8px; text-align:right; color:#e2e8f0;">${t.quantity}</td>
+                        <td style="padding:8px; text-align:right; color:#e2e8f0;">$${parseFloat(t.gross_sale_price).toFixed(2)}</td>
+                        <td style="padding:8px; text-align:right; color:${cogsColor}; font-weight:600;">
+                          ${hasCogs ? `$${parseFloat(t.cogs).toFixed(2)}` : '❌ Missing'}
+                        </td>
+                        <td style="padding:8px; text-align:right; color:${profitColor};">
+                          ${t.net_profit ? `$${parseFloat(t.net_profit).toFixed(2)}` : '-'}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        });
+
+        // Marketplace orders
+        if (marketplace.length > 0) {
+          html += `
+            <div style="margin-bottom:20px;">
+              <h4 style="color:#8b5cf6; margin:8px 0;">🛒 Marketplace Orders (${marketplace.length} transactions)</h4>
+              <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                <thead>
+                  <tr style="border-bottom:1px solid #1f2937;">
+                    <th style="text-align:left; padding:8px; color:#94a3b8;">Date</th>
+                    <th style="text-align:left; padding:8px; color:#94a3b8;">Item Name</th>
+                    <th style="text-align:right; padding:8px; color:#94a3b8;">Qty</th>
+                    <th style="text-align:right; padding:8px; color:#94a3b8;">Price</th>
+                    <th style="text-align:right; padding:8px; color:#94a3b8;">COGS</th>
+                    <th style="text-align:right; padding:8px; color:#94a3b8;">Profit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${marketplace.map(t => {
+                    const hasCogs = t.cogs && t.cogs > 0;
+                    const cogsColor = hasCogs ? '#22c55e' : '#ef4444';
+                    const profitColor = t.net_profit > 0 ? '#22c55e' : t.net_profit < 0 ? '#ef4444' : '#94a3b8';
+
+                    return `
+                      <tr style="border-bottom:1px solid #1f2937;">
+                        <td style="padding:8px; color:#e2e8f0;">${new Date(t.transaction_date).toLocaleDateString()}</td>
+                        <td style="padding:8px; color:#e2e8f0;">${t.item_name.length > 50 ? t.item_name.substring(0, 50) + '...' : t.item_name}</td>
+                        <td style="padding:8px; text-align:right; color:#e2e8f0;">${t.quantity}</td>
+                        <td style="padding:8px; text-align:right; color:#e2e8f0;">$${parseFloat(t.gross_sale_price).toFixed(2)}</td>
+                        <td style="padding:8px; text-align:right; color:${cogsColor}; font-weight:600;">
+                          ${hasCogs ? `$${parseFloat(t.cogs).toFixed(2)}` : '❌ Missing'}
+                        </td>
+                        <td style="padding:8px; text-align:right; color:${profitColor};">
+                          ${t.net_profit ? `$${parseFloat(t.net_profit).toFixed(2)}` : '-'}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        }
+
+        content.innerHTML = html;
+      } catch (error) {
+        document.getElementById('product-transactions-content').innerHTML = `<div class="danger">Error loading transactions: ${error.message}</div>`;
+      }
     }
 
     // Buyers
@@ -1381,10 +1605,62 @@
                      loading="lazy" />
               </td>
               <td style="padding:12px 8px;">
-                <div style="font-weight:500;">${p.name}</div>
+                <div id="name-display-${p.id}" style="display:flex; align-items:center; gap:8px;">
+                  <div style="font-weight:500;">${p.name}</div>
+                  <button onclick="editProductName(${p.id})"
+                          id="edit-name-btn-${p.id}"
+                          style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; white-space:nowrap;"
+                          title="Rename product">
+                    ✏️
+                  </button>
+                </div>
+                <div id="name-edit-${p.id}" style="display:none;">
+                  <input type="text"
+                         id="name-input-${p.id}"
+                         value="${p.name.replace(/"/g, '&quot;')}"
+                         style="width:100%; padding:6px 8px; background:#0f172a; border:1px solid #3b82f6; color:#e2e8f0; border-radius:4px; font-size:13px; margin-bottom:6px;" />
+                  <div style="display:flex; gap:4px;">
+                    <button onclick="applyProductName(${p.id})"
+                            style="padding:4px 8px; background:#22c55e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:11px;"
+                            title="Apply name change">
+                      ✓
+                    </button>
+                    <button onclick="cancelEditProductName(${p.id})"
+                            style="padding:4px 8px; background:#334155; color:#e2e8f0; border:none; border-radius:3px; cursor:pointer; font-size:11px;"
+                            title="Cancel">
+                      ✕
+                    </button>
+                  </div>
+                </div>
               </td>
               <td style="padding:12px 8px;">
-                <div class="muted" style="font-size:12px;">${p.category}</div>
+                <div id="category-display-${p.id}" style="display:flex; align-items:center; gap:8px;">
+                  <div class="muted" style="font-size:12px;">${p.category}</div>
+                  <button onclick="editCategory(${p.id})"
+                          id="edit-category-btn-${p.id}"
+                          style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; white-space:nowrap;"
+                          title="Edit category">
+                    ✏️
+                  </button>
+                </div>
+                <div id="category-edit-${p.id}" style="display:none;">
+                  <input type="text"
+                         id="category-input-${p.id}"
+                         value="${p.category.replace(/"/g, '&quot;')}"
+                         style="width:100%; padding:6px 8px; background:#0f172a; border:1px solid #3b82f6; color:#e2e8f0; border-radius:4px; font-size:13px; margin-bottom:6px;" />
+                  <div style="display:flex; gap:4px;">
+                    <button onclick="applyCategory(${p.id})"
+                            style="padding:4px 8px; background:#22c55e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:11px;"
+                            title="Apply category change">
+                      ✓
+                    </button>
+                    <button onclick="cancelEditCategory(${p.id})"
+                            style="padding:4px 8px; background:#334155; color:#e2e8f0; border:none; border-radius:3px; cursor:pointer; font-size:11px;"
+                            title="Cancel">
+                      ✕
+                    </button>
+                  </div>
+                </div>
               </td>
               <td style="padding:12px 8px; text-align:center;">
                 ${hasMatches ? `
@@ -1427,13 +1703,15 @@
                     <label style="display:block; font-size:11px; color:#22c55e; margin-bottom:4px;">Include Keywords (comma-separated):</label>
                     <textarea id="include-keywords-${p.id}"
                               style="width:100%; min-height:50px; padding:8px; background:#0f172a; border:1px solid #22c55e; color:#e2e8f0; border-radius:4px; font-size:12px; resize:vertical;"
-                              placeholder="keyword1, keyword2, keyword3">${p.includeKeywords ? p.includeKeywords.join(', ') : ''}</textarea>
+                              placeholder="keyword1, keyword2, keyword3"
+                              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">${p.includeKeywords ? p.includeKeywords.join(', ') : ''}</textarea>
                   </div>
                   <div style="margin-bottom:8px;">
                     <label style="display:block; font-size:11px; color:#ef4444; margin-bottom:4px;">Exclude Keywords (comma-separated, optional):</label>
                     <textarea id="exclude-keywords-${p.id}"
                               style="width:100%; min-height:40px; padding:8px; background:#0f172a; border:1px solid #ef4444; color:#e2e8f0; border-radius:4px; font-size:12px; resize:vertical;"
-                              placeholder="keyword to exclude, another exclude">${p.excludeKeywords ? p.excludeKeywords.join(', ') : ''}</textarea>
+                              placeholder="keyword to exclude, another exclude"
+                              autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">${p.excludeKeywords ? p.excludeKeywords.join(', ') : ''}</textarea>
                   </div>
                   <div style="margin-bottom:8px;">
                     <label style="display:block; font-size:11px; color:#94a3b8; margin-bottom:4px;">Priority (higher = checked first):</label>
@@ -1515,14 +1793,20 @@
                             <tr style="border-bottom:1px solid #1f2937;">
                               <td style="padding:8px; color:#94a3b8;">${date}</td>
                               <td style="padding:8px;">${m.item_name}</td>
-                              <td style="padding:8px; color:#64748b;">${m.show_name || 'Show #' + m.show_id}</td>
+                              <td style="padding:8px; color:#64748b;">${m.sale_type === 'marketplace' ? 'Marketplace' : (m.show_name || 'Show #' + m.show_id)}</td>
                               <td style="padding:8px; text-align:right; color:#22c55e;">$${m.gross_sale_price}</td>
                               <td style="padding:8px; font-size:11px; color:#f59e0b;">"${matchedKeyword}"</td>
                               <td style="padding:8px; text-align:center;">
-                                <button onclick="navigateToShow(${m.show_id}, ${m.id})"
-                                        style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">
-                                  Go to Show →
-                                </button>
+                                ${m.sale_type === 'marketplace'
+                                  ? `<button onclick="navigateToMarketplace(${m.id})"
+                                            style="padding:4px 8px; background:#8b5cf6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">
+                                       Go to Marketplace →
+                                     </button>`
+                                  : `<button onclick="navigateToShow(${m.show_id}, ${m.id})"
+                                            style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">
+                                       Go to Show →
+                                     </button>`
+                                }
                               </td>
                             </tr>
                           `;
@@ -1687,6 +1971,29 @@
       }
     }
 
+    // Navigate to marketplace for a specific transaction
+    async function navigateToMarketplace(transactionId) {
+      // Switch to Marketplace tab
+      showTab('marketplace');
+
+      // Wait for tab to render
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Scroll to and highlight the specific transaction
+      if (transactionId) {
+        const transactionRow = document.getElementById(`transaction-${transactionId}`);
+        if (transactionRow) {
+          transactionRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          transactionRow.style.background = '#134e4a';
+          transactionRow.style.border = '2px solid #22c55e';
+          setTimeout(() => {
+            transactionRow.style.background = '';
+            transactionRow.style.border = '';
+          }, 2500);
+        }
+      }
+    }
+
     // Helper: Get rule type label
     function getRuleTypeLabel(ruleType) {
       const labels = {
@@ -1728,7 +2035,7 @@
     async function applyKeywords(productId) {
       try {
         // Get rule type
-        const ruleType = document.getElementById(`rule-type-${productId}`).value;
+        let ruleType = document.getElementById(`rule-type-${productId}`).value;
 
         // Get include keywords
         const includeText = document.getElementById(`include-keywords-${productId}`).value.trim();
@@ -1746,6 +2053,12 @@
 
         // Get priority
         const priority = parseInt(document.getElementById(`priority-${productId}`).value) || 100;
+
+        // AUTO-FIX: If user has exclude keywords but wrong rule type, force to include_and_exclude
+        if (excludeKeywords.length > 0 && ruleType !== 'include_and_exclude' && ruleType !== 'catch_all') {
+          console.warn(`Auto-changing rule type from ${ruleType} to include_and_exclude because exclude keywords are present`);
+          ruleType = 'include_and_exclude';
+        }
 
         // Validate: CATCH_ALL doesn't need keywords, others need at least include keywords
         if (ruleType !== 'catch_all' && includeKeywords.length === 0) {
@@ -1780,6 +2093,126 @@
       } catch (error) {
         alert(`Error updating keywords: ${error.message}`);
         console.error('Error updating keywords:', error);
+      }
+    }
+
+    // Edit product name for a catalog item
+    function editProductName(productId) {
+      // Hide display, show edit
+      document.getElementById(`name-display-${productId}`).style.display = 'none';
+      document.getElementById(`name-edit-${productId}`).style.display = 'block';
+
+      // Focus the input
+      document.getElementById(`name-input-${productId}`).focus();
+      document.getElementById(`name-input-${productId}`).select();
+    }
+
+    // Cancel editing product name
+    function cancelEditProductName(productId) {
+      // Show display, hide edit
+      document.getElementById(`name-display-${productId}`).style.display = 'flex';
+      document.getElementById(`name-edit-${productId}`).style.display = 'none';
+
+      // Reset field to original value
+      const product = catalogProducts.find(p => p.id === productId);
+      if (product) {
+        document.getElementById(`name-input-${productId}`).value = product.name;
+      }
+    }
+
+    // Apply product name change
+    async function applyProductName(productId) {
+      try {
+        const newName = document.getElementById(`name-input-${productId}`).value.trim();
+
+        if (!newName) {
+          alert('Product name cannot be empty');
+          return;
+        }
+
+        // Update via API
+        const res = await fetch(`${apiBase}/product-catalog/${productId}`, {
+          method: 'PATCH',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: newName
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to update product name');
+        }
+
+        // Success - reload catalog to show updated name
+        await loadMasterCatalog();
+
+      } catch (error) {
+        alert(`Error updating product name: ${error.message}`);
+        console.error('Error updating product name:', error);
+      }
+    }
+
+    // Edit category for a catalog item
+    function editCategory(productId) {
+      // Hide display, show edit
+      document.getElementById(`category-display-${productId}`).style.display = 'none';
+      document.getElementById(`category-edit-${productId}`).style.display = 'block';
+
+      // Focus the input
+      document.getElementById(`category-input-${productId}`).focus();
+      document.getElementById(`category-input-${productId}`).select();
+    }
+
+    // Cancel editing category
+    function cancelEditCategory(productId) {
+      // Show display, hide edit
+      document.getElementById(`category-display-${productId}`).style.display = 'flex';
+      document.getElementById(`category-edit-${productId}`).style.display = 'none';
+
+      // Reset field to original value
+      const product = catalogProducts.find(p => p.id === productId);
+      if (product) {
+        document.getElementById(`category-input-${productId}`).value = product.category;
+      }
+    }
+
+    // Apply category change
+    async function applyCategory(productId) {
+      try {
+        const newCategory = document.getElementById(`category-input-${productId}`).value.trim();
+
+        if (!newCategory) {
+          alert('Category cannot be empty');
+          return;
+        }
+
+        // Update via API
+        const res = await fetch(`${apiBase}/product-catalog/${productId}`, {
+          method: 'PATCH',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            category: newCategory
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to update category');
+        }
+
+        // Success - reload catalog to show updated category
+        await loadMasterCatalog();
+
+      } catch (error) {
+        alert(`Error updating category: ${error.message}`);
+        console.error('Error updating category:', error);
       }
     }
 

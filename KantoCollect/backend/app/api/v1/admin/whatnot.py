@@ -8,7 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional, List
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile, status
-from sqlmodel import Session, select
+from sqlmodel import Session, select, or_
 
 from app.api.deps import AdminUser
 from app.core.whatnot_database import get_whatnot_db
@@ -259,7 +259,12 @@ async def list_transactions(
     offset: int = 0,
 ) -> List[TransactionRead]:
     """List transactions with optional filters. Filter by sale_type to get stream or marketplace orders."""
-    query = select(SalesTransaction).order_by(SalesTransaction.transaction_date.desc())
+    query = select(SalesTransaction).where(
+        or_(
+            SalesTransaction.show_id != None,
+            SalesTransaction.sale_type == 'marketplace'
+        )
+    ).order_by(SalesTransaction.transaction_date.desc())
 
     if show_id:
         query = query.where(SalesTransaction.show_id == show_id)
@@ -348,7 +353,7 @@ async def recalculate_cogs(
 
 # === PRODUCT ENDPOINTS ===
 
-@router.get("/products", response_model=List[ProductRead])
+@router.get("/products")
 async def list_products(
     current_user: AdminUser,
     db: Session = Depends(get_whatnot_db),
@@ -356,37 +361,101 @@ async def list_products(
     has_cogs: Optional[bool] = None,
     limit: int = 50,
     offset: int = 0,
-) -> List[ProductRead]:
-    """List products with optional filters."""
-    query = select(WhatnotProduct).order_by(WhatnotProduct.total_gross_sales.desc())
+) -> dict:
+    """List products with optional filters and pagination metadata."""
 
-    if search:
-        like = f"%{search}%"
-        query = query.where(WhatnotProduct.product_name.ilike(like))
-
-    products = db.exec(query.offset(offset).limit(limit)).all()
-
-    # Filter by COGS if requested
+    # When filtering by COGS, we need to check ALL products first, then paginate
+    # Otherwise low-revenue items with missing COGS won't show up in top 50
     if has_cogs is not None:
+        # Get ALL products (or with search filter)
+        query = select(WhatnotProduct).order_by(WhatnotProduct.total_gross_sales.desc())
+
+        if search:
+            like = f"%{search}%"
+            query = query.where(WhatnotProduct.product_name.ilike(like))
+
+        all_products = db.exec(query).all()
+
+        # Filter by COGS status
         filtered = []
-        for product in products:
-            # Check if product has any transactions with COGS
+        for product in all_products:
+            # Get ALL transactions for this product
             transactions = db.exec(
                 select(SalesTransaction)
                 .where(SalesTransaction.product_id == product.id)
-                .limit(1)
+                .where(
+                    or_(
+                        SalesTransaction.show_id != None,
+                        SalesTransaction.sale_type == 'marketplace'
+                    )
+                )
             ).all()
 
-            has_any_cogs = any(t.cogs is not None for t in transactions)
+            if not transactions:
+                continue  # Skip products with no transactions
 
-            if has_cogs and has_any_cogs:
+            # Check COGS status
+            # has_cogs=True: ALL transactions must have COGS > 0 (positive values only)
+            # has_cogs=False: ANY transaction missing COGS (NULL or $0.00)
+            all_have_cogs = all(t.cogs is not None and t.cogs > 0 for t in transactions)
+            any_missing_cogs = any(t.cogs is None or t.cogs == 0 for t in transactions)
+
+            if has_cogs and all_have_cogs:
                 filtered.append(product)
-            elif not has_cogs and not has_any_cogs:
+            elif not has_cogs and any_missing_cogs:
                 filtered.append(product)
 
-        products = filtered
+        # Store total count before pagination
+        total_count = len(filtered)
 
-    return [_to_product_read(p) for p in products]
+        # Now apply pagination to filtered results
+        products = filtered[offset:offset + limit]
+    else:
+        # No COGS filter - use normal pagination
+        from sqlmodel import func
+
+        query = select(WhatnotProduct).order_by(WhatnotProduct.total_gross_sales.desc())
+
+        if search:
+            like = f"%{search}%"
+            query = query.where(WhatnotProduct.product_name.ilike(like))
+
+        # Get total count
+        count_query = select(func.count(WhatnotProduct.id))
+        if search:
+            like = f"%{search}%"
+            count_query = count_query.where(WhatnotProduct.product_name.ilike(like))
+        total_count = db.exec(count_query).one()
+
+        products = db.exec(query.offset(offset).limit(limit)).all()
+
+    # Add has_cogs field to each product by checking transactions
+    result = []
+    for p in products:
+        product_dict = _to_product_read(p).model_dump()
+
+        # Check if this product's transactions have COGS
+        transactions = db.exec(
+            select(SalesTransaction)
+            .where(SalesTransaction.product_id == p.id)
+            .where(
+                or_(
+                    SalesTransaction.show_id != None,
+                    SalesTransaction.sale_type == 'marketplace'
+                )
+            )
+        ).all()
+
+        # Add has_cogs field - True if ALL transactions have COGS > 0 (positive values only, not NULL or $0.00)
+        product_dict['has_cogs'] = all(t.cogs is not None and t.cogs > 0 for t in transactions) if transactions else False
+        result.append(product_dict)
+
+    return {
+        "products": result,
+        "total": total_count,
+        "limit": limit,
+        "offset": offset
+    }
 
 
 @router.get("/products/{product_id}", response_model=ProductRead)
@@ -667,8 +736,15 @@ async def get_product_catalog(
         select(ProductCatalog).order_by(ProductCatalog.priority.desc())
     ).all()
 
-    # Get all transactions for matching
-    transactions = db.exec(select(SalesTransaction)).all()
+    # Get all transactions for matching (exclude test transactions: NULL show_id AND not marketplace)
+    transactions = db.exec(
+        select(SalesTransaction).where(
+            or_(
+                SalesTransaction.show_id != None,
+                SalesTransaction.sale_type == 'marketplace'
+            )
+        )
+    ).all()
 
     # NEW RULE-BASED MATCHING LOGIC
     # Simple, universal matching that doesn't require constant patching
@@ -806,8 +882,15 @@ async def save_product_cogs(
         db.flush()  # Get the rule ID
         rule_id = rule.id
 
-    # Apply COGS to all matching transactions
-    all_transactions = db.exec(select(SalesTransaction)).all()
+    # Apply COGS to all matching transactions (exclude test transactions: NULL show_id AND not marketplace)
+    all_transactions = db.exec(
+        select(SalesTransaction).where(
+            or_(
+                SalesTransaction.show_id != None,
+                SalesTransaction.sale_type == 'marketplace'
+            )
+        )
+    ).all()
     cogs_decimal = Decimal(str(cogs))
     matched_count = 0
     affected_show_ids = set()
@@ -874,9 +957,14 @@ async def add_catalog_item(
     url_clean = url.split('?')[0]
 
     # Check if this URL already exists (ignoring query params)
-    existing_by_url = db.exec(
-        select(ProductCatalog).where(ProductCatalog.image_url.like(f"{url_clean}%"))
-    ).first()
+    # Get all items and check URLs in Python to avoid LIKE wildcard issues with %20 in URLs
+    all_items = db.exec(select(ProductCatalog)).all()
+    existing_by_url = None
+    for item in all_items:
+        item_url_clean = item.image_url.split('?')[0]
+        if item_url_clean == url_clean:
+            existing_by_url = item
+            break
 
     if existing_by_url:
         raise HTTPException(
@@ -1044,8 +1132,15 @@ async def mark_catalog_item_mapped(
     if not catalog_item:
         raise HTTPException(status_code=404, detail="Catalog item not found")
 
-    # Find all transactions that match this catalog item's keywords
-    all_transactions = db.exec(select(SalesTransaction)).all()
+    # Find all transactions that match this catalog item's keywords (exclude test transactions: NULL show_id AND not marketplace)
+    all_transactions = db.exec(
+        select(SalesTransaction).where(
+            or_(
+                SalesTransaction.show_id != None,
+                SalesTransaction.sale_type == 'marketplace'
+            )
+        )
+    ).all()
 
     mapped_count = 0
     for t in all_transactions:
@@ -1086,13 +1181,27 @@ async def get_mapping_status(
     """Get overview of mapped vs unmapped transactions."""
     from sqlmodel import func
 
-    # Total transactions
-    total = db.exec(select(func.count(SalesTransaction.id))).one()
+    # Total transactions (exclude test transactions: NULL show_id AND not marketplace)
+    total = db.exec(
+        select(func.count(SalesTransaction.id))
+        .where(
+            or_(
+                SalesTransaction.show_id != None,
+                SalesTransaction.sale_type == 'marketplace'
+            )
+        )
+    ).one()
 
     # Mapped transactions
     mapped = db.exec(
         select(func.count(SalesTransaction.id))
         .where(SalesTransaction.is_mapped == True)
+        .where(
+            or_(
+                SalesTransaction.show_id != None,
+                SalesTransaction.sale_type == 'marketplace'
+            )
+        )
     ).one()
 
     # Unmapped transactions
@@ -1102,6 +1211,12 @@ async def get_mapping_status(
     unmapped_samples = db.exec(
         select(SalesTransaction)
         .where(SalesTransaction.is_mapped == False)
+        .where(
+            or_(
+                SalesTransaction.show_id != None,
+                SalesTransaction.sale_type == 'marketplace'
+            )
+        )
         .limit(10)
     ).all()
 
