@@ -1,1 +1,1 @@
-web: cd KantoCollect/backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+web: cd KantoCollect/backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
