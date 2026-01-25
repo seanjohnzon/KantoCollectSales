@@ -854,7 +854,7 @@
       container.innerHTML = shows.map(show => `
         <div class="card">
           <strong>${show.show_date}</strong> - ${show.show_name || 'Unnamed'}<br>
-          <span class="muted">${show.item_count} items • $${show.total_gross_sales}</span>
+          <span class="muted">${show.item_count} items • $${parseFloat(show.total_gross_sales || 0).toFixed(2)}</span>
         </div>
       `).join('');
     }
@@ -1490,8 +1490,8 @@
       container.innerHTML = products.map(p => `
         <div class="card" style="cursor:pointer;" onclick="showProductTransactions(${p.id}, '${p.product_name.replace(/'/g, "\\'")}')">
           <strong>${p.product_name}</strong><br>
-          <div class="muted">Sold ${p.times_sold}x • Avg: $${p.avg_sale_price}</div>
-          <div>Total: <strong>$${p.total_gross_sales}</strong></div>
+          <div class="muted">Sold ${p.times_sold}x • Avg: $${parseFloat(p.avg_sale_price || 0).toFixed(2)}</div>
+          <div>Total: <strong>$${parseFloat(p.total_gross_sales || 0).toFixed(2)}</strong></div>
           ${p.has_cogs ? '<div class="success">✅ Has COGS</div>' : '<div class="warning">⚠ Missing COGS</div>'}
           <div style="margin-top:8px; font-size:11px; color:#3b82f6;">📋 Click to view transactions</div>
         </div>
@@ -1718,8 +1718,8 @@
       container.innerHTML = buyers.map(b => `
         <div class="card">
           <strong>@${b.username}</strong> ${b.is_repeat_buyer ? '⭐' : ''}<br>
-          <div class="muted">${b.total_purchases} purchases • Avg: $${b.avg_purchase_price}</div>
-          <div>Total Spent: <strong>$${b.total_spent}</strong></div>
+          <div class="muted">${b.total_purchases} purchases • Avg: $${parseFloat(b.avg_purchase_price || 0).toFixed(2)}</div>
+          <div>Total Spent: <strong>$${parseFloat(b.total_spent || 0).toFixed(2)}</strong></div>
         </div>
       `).join('');
     }
@@ -1733,15 +1733,15 @@
       const cogsPct = data.cogs_coverage.coverage_percent || 0;
       stats.innerHTML = `
         <div class="stat-card">
-          <div class="stat-value">$${data.total_gross_sales}</div>
+          <div class="stat-value">$${parseFloat(data.total_gross_sales || 0).toFixed(2)}</div>
           <div class="stat-label">Gross Sales</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">$${data.total_net_earnings}</div>
+          <div class="stat-value">$${parseFloat(data.total_net_earnings || 0).toFixed(2)}</div>
           <div class="stat-label">Net Earnings</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value">$${data.total_profit}</div>
+          <div class="stat-value">$${parseFloat(data.total_profit || 0).toFixed(2)}</div>
           <div class="stat-label">Net Profit</div>
         </div>
         <div class="stat-card">
@@ -1752,17 +1752,17 @@
 
       const topProds = await fetch(`${apiBase}/analytics/top-products?limit=5`, { headers: authHeaders() }).then(r => r.json());
       document.getElementById("topProducts").innerHTML = topProds.map((p, i) =>
-        `<div>${i+1}. ${p.product_name} - $${p.total_revenue}</div>`
+        `<div>${i+1}. ${p.product_name} - $${parseFloat(p.total_revenue || 0).toFixed(2)}</div>`
       ).join('');
 
       const topBuy = await fetch(`${apiBase}/analytics/top-buyers?limit=5`, { headers: authHeaders() }).then(r => r.json());
       document.getElementById("topBuyers").innerHTML = topBuy.map((b, i) =>
-        `<div>${i+1}. @${b.username} - $${b.total_spent} (${b.purchase_count} purchases)</div>`
+        `<div>${i+1}. @${b.username} - $${parseFloat(b.total_spent || 0).toFixed(2)} (${b.purchase_count} purchases)</div>`
       ).join('');
 
       const rulePref = await fetch(`${apiBase}/analytics/cogs-rule-performance`, { headers: authHeaders() }).then(r => r.json());
       document.getElementById("rulePerformance").innerHTML = rulePref.map(r =>
-        `<div><strong>${r.rule_name}:</strong> ${r.matches} matches, $${r.total_cogs_assigned} COGS assigned</div>`
+        `<div><strong>${r.rule_name}:</strong> ${r.matches} matches, $${parseFloat(r.total_cogs_assigned || 0).toFixed(2)} COGS assigned</div>`
       ).join('');
     }
 
@@ -1882,7 +1882,7 @@
                 ` : `<div class="muted">0</div>`}
               </td>
               <td style="padding:12px 8px; text-align:right; font-weight:600;">
-                $${p.revenue}
+                $${parseFloat(p.revenue || 0).toFixed(2)}
               </td>
               ${adminEnabled ? `
               <td class="keywords-column" style="padding:12px 8px;">
@@ -2016,7 +2016,7 @@
                               <td style="padding:8px; color:#94a3b8;">${date}</td>
                               <td style="padding:8px;">${m.item_name}</td>
                               <td style="padding:8px; color:#64748b;">${m.sale_type === 'marketplace' ? 'Marketplace' : (m.show_name || 'Show #' + m.show_id)}</td>
-                              <td style="padding:8px; text-align:right; color:#22c55e;">$${m.gross_sale_price}</td>
+                              <td style="padding:8px; text-align:right; color:#22c55e;">$${parseFloat(m.gross_sale_price || 0).toFixed(2)}</td>
                               ${adminEnabled ? `<td style="padding:8px; font-size:11px; color:#f59e0b;">"${matchedKeyword}"</td>` : ''}
                               <td style="padding:8px; text-align:center;">
                                 ${m.sale_type === 'marketplace'
