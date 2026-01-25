@@ -150,10 +150,9 @@
           <div id="addCatalogMessage" style="margin-top:12px; font-size:13px;"></div>
         </div>
 
-        <!-- Save Button -->
-        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
-          <div class="muted" style="font-size:12px;">Enter COGS values and click Save All to update the catalog</div>
-          <button onclick="saveAllCatalogCOGS()" id="saveCatalogCOGSBtn" style="display:none;">💾 Save All COGS</button>
+        <!-- Instructions -->
+        <div style="margin-bottom:16px;">
+          <div class="muted" style="font-size:12px;">💡 Enter COGS for each item and click "Apply COGS" to save and lock. Click the value to edit later.</div>
         </div>
 
         <!-- Products Table -->
@@ -1047,7 +1046,7 @@
           const showName = show.show_name.length > 50 ? show.show_name.substring(0, 47) + '...' : show.show_name;
 
           return `
-            <tr style="border-bottom:1px solid #1f2937; transition:background 0.2s; cursor:pointer;"
+            <tr id="show-${show.id}" style="border-bottom:1px solid #1f2937; transition:background 0.2s; cursor:pointer;"
                 onclick="viewShowDetail(${show.id})"
                 onmouseover="this.style.background='#111827'"
                 onmouseout="this.style.background='transparent'">
@@ -1142,7 +1141,7 @@
           const roiColor = roi !== 'N/A' ? (parseFloat(roi) > 0 ? '#22c55e' : '#ef4444') : '#94a3b8';
 
           return `
-            <tr style="border-bottom:1px solid #1f2937;">
+            <tr id="transaction-${t.id}" style="border-bottom:1px solid #1f2937;">
               <td style="padding:12px 8px;">
                 <div style="font-weight:500; max-width:300px;">${t.item_name}</div>
               </td>
@@ -1338,6 +1337,10 @@
     // Master Catalog (table format with editable COGS)
     let catalogProducts = [];
 
+    // Track expanded catalog items
+    let expandedCatalogItems = new Set();
+    let catalogTransactions = {}; // Cache for matched transactions
+
     async function loadMasterCatalog() {
       const tbody = document.getElementById("catalogTableBody");
 
@@ -1361,59 +1364,338 @@
 
         catalogProducts = data.products;
 
-        // Show save button if admin
-        if (adminEnabled) {
-          document.getElementById('saveCatalogCOGSBtn').style.display = 'inline-block';
+        // Render catalog items
+        const rows = [];
+
+        for (const [index, p] of data.products.entries()) {
+          const isExpanded = expandedCatalogItems.has(p.id);
+          const hasMatches = p.sales > 0;
+
+          // Main product row
+          rows.push(`
+            <tr style="border-bottom:1px solid #1f2937;" id="catalog-item-${p.id}">
+              <td style="padding:12px 8px;">
+                <img src="${p.imageUrl}"
+                     style="width:60px; height:60px; border-radius:6px; object-fit:cover;"
+                     onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22%3E%3Crect fill=%22%23333%22 width=%2260%22 height=%2260%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2210%22%3E?%3C/text%3E%3C/svg%3E';"
+                     loading="lazy" />
+              </td>
+              <td style="padding:12px 8px;">
+                <div style="font-weight:500;">${p.name}</div>
+              </td>
+              <td style="padding:12px 8px;">
+                <div class="muted" style="font-size:12px;">${p.category}</div>
+              </td>
+              <td style="padding:12px 8px; text-align:center;">
+                ${hasMatches ? `
+                  <div onclick="toggleCatalogMatches(${p.id})" style="cursor:pointer; color:#3b82f6; font-weight:600;">
+                    ${isExpanded ? '▼' : '▶'} ${p.sales}
+                  </div>
+                ` : `<div class="muted">0</div>`}
+              </td>
+              <td style="padding:12px 8px; text-align:right; font-weight:600;">
+                $${p.revenue}
+              </td>
+              <td style="padding:12px 8px;">
+                <div id="keywords-display-${p.id}" style="display:flex; align-items:center; gap:8px;">
+                  <div style="font-size:11px; color:#64748b; max-width:250px; overflow:hidden; text-overflow:ellipsis;">${p.keywords.join(', ')}</div>
+                  <button onclick="editKeywords(${p.id})"
+                          id="edit-keywords-btn-${p.id}"
+                          style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px; white-space:nowrap;"
+                          title="Edit keywords">
+                    ✏️ Edit
+                  </button>
+                </div>
+                <div id="keywords-edit-${p.id}" style="display:none;">
+                  <textarea id="keywords-input-${p.id}"
+                            style="width:100%; min-height:60px; padding:8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px; resize:vertical;"
+                            placeholder="Enter keywords separated by commas">${p.keywords.join(', ')}</textarea>
+                  <div style="display:flex; gap:8px; margin-top:8px;">
+                    <button onclick="applyKeywords(${p.id})"
+                            style="padding:6px 12px; background:#22c55e; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
+                            title="Apply keyword changes">
+                      ✓ Apply
+                    </button>
+                    <button onclick="cancelEditKeywords(${p.id})"
+                            style="padding:6px 12px; background:#334155; color:#e2e8f0; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
+                            title="Cancel editing">
+                      ✕ Cancel
+                    </button>
+                  </div>
+                </div>
+              </td>
+              <td style="padding:12px 8px;">
+                <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+                  <input type="number"
+                         step="0.01"
+                         min="0"
+                         value=""
+                         placeholder="0.00"
+                         id="cogs-input-${p.id}"
+                         data-product-id="${p.id}"
+                         data-product-name="${p.name.replace(/"/g, '&quot;')}"
+                         data-keywords='${JSON.stringify(p.keywords)}'
+                         style="width:80px; text-align:right; padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
+                  <button onclick="applyCatalogCOGS(${p.id})"
+                          id="apply-cogs-btn-${p.id}"
+                          style="padding:6px 12px; background:#22c55e; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; white-space:nowrap;"
+                          title="Apply COGS to all ${p.sales} transactions">
+                    Apply COGS
+                  </button>
+                </div>
+              </td>
+              <td style="padding:12px 8px; text-align:center;">
+                <button onclick="deleteCatalogItem(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
+                        style="padding:6px 12px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
+                        title="Delete ${p.name}">
+                  🗑️
+                </button>
+              </td>
+            </tr>
+          `);
+
+          // Expanded matched transactions
+          if (isExpanded && catalogTransactions[p.id]) {
+            const matches = catalogTransactions[p.id];
+            rows.push(`
+              <tr style="background:#0f172a;">
+                <td colspan="8" style="padding:16px 24px;">
+                  <div style="font-size:13px; font-weight:600; margin-bottom:12px; color:#94a3b8;">
+                    📋 ${matches.length} Matched Transactions
+                  </div>
+                  <div style="max-height:400px; overflow-y:auto;">
+                    <table style="width:100%; font-size:12px; border-collapse:collapse;">
+                      <thead>
+                        <tr style="border-bottom:1px solid #334155;">
+                          <th style="padding:8px; text-align:left; color:#94a3b8;">Date</th>
+                          <th style="padding:8px; text-align:left; color:#94a3b8;">Item Name</th>
+                          <th style="padding:8px; text-align:left; color:#94a3b8;">Show</th>
+                          <th style="padding:8px; text-align:right; color:#94a3b8;">Price</th>
+                          <th style="padding:8px; text-align:left; color:#94a3b8;">Matched Keyword</th>
+                          <th style="padding:8px; text-align:center; color:#94a3b8;">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${matches.map(m => {
+                          const date = new Date(m.transaction_date).toLocaleDateString();
+                          const matchedKeyword = m.matchedKeyword || 'Unknown';
+                          return `
+                            <tr style="border-bottom:1px solid #1f2937;">
+                              <td style="padding:8px; color:#94a3b8;">${date}</td>
+                              <td style="padding:8px;">${m.item_name}</td>
+                              <td style="padding:8px; color:#64748b;">${m.show_name || 'Show #' + m.show_id}</td>
+                              <td style="padding:8px; text-align:right; color:#22c55e;">$${m.gross_sale_price}</td>
+                              <td style="padding:8px; font-size:11px; color:#f59e0b;">"${matchedKeyword}"</td>
+                              <td style="padding:8px; text-align:center;">
+                                <button onclick="navigateToShow(${m.show_id}, ${m.id})"
+                                        style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">
+                                  Go to Show →
+                                </button>
+                              </td>
+                            </tr>
+                          `;
+                        }).join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </td>
+              </tr>
+            `);
+          }
         }
 
-        tbody.innerHTML = data.products.map((p, index) => `
-          <tr style="border-bottom:1px solid #1f2937;">
-            <td style="padding:12px 8px;">
-              <img src="${p.imageUrl}"
-                   style="width:60px; height:60px; border-radius:6px; object-fit:cover;"
-                   onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22%3E%3Crect fill=%22%23333%22 width=%2260%22 height=%2260%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2210%22%3E?%3C/text%3E%3C/svg%3E';"
-                   loading="lazy" />
-            </td>
-            <td style="padding:12px 8px;">
-              <div style="font-weight:500;">${p.name}</div>
-            </td>
-            <td style="padding:12px 8px;">
-              <div class="muted" style="font-size:12px;">${p.category}</div>
-            </td>
-            <td style="padding:12px 8px; text-align:center;">
-              <div class="muted">${p.sales}</div>
-            </td>
-            <td style="padding:12px 8px; text-align:right; font-weight:600;">
-              $${p.revenue}
-            </td>
-            <td style="padding:12px 8px;">
-              <div style="font-size:11px; color:#64748b;">${p.keywords.join(', ')}</div>
-            </td>
-            <td style="padding:12px 8px; text-align:right;">
-              <input type="number"
-                     step="0.01"
-                     min="0"
-                     value=""
-                     placeholder="0.00"
-                     data-product-id="${p.id}"
-                     data-product-index="${index}"
-                     data-product-name="${p.name.replace(/"/g, '&quot;')}"
-                     data-keywords='${JSON.stringify(p.keywords)}'
-                     style="width:90px; text-align:right; padding:6px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:13px;" />
-            </td>
-            <td style="padding:12px 8px; text-align:center;">
-              <button onclick="deleteCatalogItem(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
-                      style="padding:6px 12px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px;"
-                      title="Delete ${p.name}">
-                🗑️
-              </button>
-            </td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = rows.join('');
 
       } catch (error) {
         tbody.innerHTML = `<tr><td colspan="8" style="padding:20px; text-align:center;" class="danger">❌ Error: ${error.message}</td></tr>`;
         console.error('Failed to load catalog:', error);
+      }
+    }
+
+    // Toggle expanded view of matched transactions
+    async function toggleCatalogMatches(productId) {
+      if (expandedCatalogItems.has(productId)) {
+        expandedCatalogItems.delete(productId);
+      } else {
+        expandedCatalogItems.add(productId);
+
+        // Fetch matched transactions if not already cached
+        if (!catalogTransactions[productId]) {
+          await fetchCatalogMatches(productId);
+        }
+      }
+
+      // Reload catalog to show/hide expanded section
+      await loadMasterCatalog();
+    }
+
+    // Fetch transactions that match this catalog item
+    async function fetchCatalogMatches(productId) {
+      try {
+        // Find the product
+        const product = catalogProducts.find(p => p.id === productId);
+        if (!product) return;
+
+        // Fetch all transactions
+        const res = await fetch(`${apiBase}/transactions?limit=10000`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Failed to fetch transactions');
+
+        const transactions = await res.json();
+
+        // Match transactions using "longest keyword wins" logic (same as backend)
+        // "Unmapped Items" loses ties to specific catalog items
+        const matches = [];
+
+        for (const t of transactions) {
+          const itemNameLower = t.item_name.toLowerCase();
+
+          // Find the best match across ALL catalog items (longest keyword)
+          let bestMatch = null;
+          let bestKeywordLength = 0;
+          let bestKeyword = null;
+          let bestIsUnmapped = false;
+
+          for (const catalogItem of catalogProducts) {
+            const isUnmapped = catalogItem.name === "Unmapped Items";
+
+            for (const keyword of catalogItem.keywords) {
+              const keywordLower = keyword.toLowerCase();
+              if (keywordLower && itemNameLower.includes(keywordLower)) {
+                const keywordLen = keywordLower.length;
+                let shouldUpdate = false;
+
+                if (keywordLen > bestKeywordLength) {
+                  // Longer keyword always wins
+                  shouldUpdate = true;
+                } else if (keywordLen === bestKeywordLength) {
+                  // Same length - prefer non-Unmapped Items
+                  if (bestIsUnmapped && !isUnmapped) {
+                    shouldUpdate = true;
+                  }
+                }
+
+                if (shouldUpdate) {
+                  bestMatch = catalogItem.id;
+                  bestKeywordLength = keywordLen;
+                  bestKeyword = keyword;
+                  bestIsUnmapped = isUnmapped;
+                }
+              }
+            }
+          }
+
+          // Only include this transaction if it matched THIS product
+          if (bestMatch === productId) {
+            matches.push({
+              ...t,
+              matchedKeyword: bestKeyword
+            });
+          }
+        }
+
+        catalogTransactions[productId] = matches;
+
+      } catch (error) {
+        console.error('Error fetching matches:', error);
+        catalogTransactions[productId] = [];
+      }
+    }
+
+    // Navigate to a specific show
+    async function navigateToShow(showId, transactionId) {
+      // Switch to Shows tab
+      showTab('shows');
+
+      // Wait for tab to render
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Open the show detail modal
+      await viewShowDetail(showId);
+
+      // Wait for modal to render
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Scroll to and highlight the specific transaction
+      if (transactionId) {
+        const transactionRow = document.getElementById(`transaction-${transactionId}`);
+        if (transactionRow) {
+          transactionRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          transactionRow.style.background = '#134e4a';
+          transactionRow.style.border = '2px solid #22c55e';
+          setTimeout(() => {
+            transactionRow.style.background = '';
+            transactionRow.style.border = '';
+          }, 2500);
+        }
+      }
+    }
+
+    // Edit keywords for a catalog item
+    function editKeywords(productId) {
+      // Hide display, show edit
+      document.getElementById(`keywords-display-${productId}`).style.display = 'none';
+      document.getElementById(`keywords-edit-${productId}`).style.display = 'block';
+
+      // Focus the textarea
+      document.getElementById(`keywords-input-${productId}`).focus();
+    }
+
+    // Cancel editing keywords
+    function cancelEditKeywords(productId) {
+      // Show display, hide edit
+      document.getElementById(`keywords-display-${productId}`).style.display = 'flex';
+      document.getElementById(`keywords-edit-${productId}`).style.display = 'none';
+
+      // Reset textarea to original keywords
+      const product = catalogProducts.find(p => p.id === productId);
+      if (product) {
+        document.getElementById(`keywords-input-${productId}`).value = product.keywords.join(', ');
+      }
+    }
+
+    // Apply keyword changes
+    async function applyKeywords(productId) {
+      try {
+        const textarea = document.getElementById(`keywords-input-${productId}`);
+        const keywordsText = textarea.value.trim();
+
+        if (!keywordsText) {
+          alert('Keywords cannot be empty');
+          return;
+        }
+
+        // Parse keywords (split by comma, trim, filter empty)
+        const keywords = keywordsText
+          .split(',')
+          .map(k => k.trim())
+          .filter(k => k.length > 0);
+
+        if (keywords.length === 0) {
+          alert('Please enter at least one keyword');
+          return;
+        }
+
+        // Update via API
+        const res = await fetch(`${apiBase}/product-catalog/${productId}`, {
+          method: 'PATCH',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ keywords })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to update keywords');
+        }
+
+        // Success - reload catalog to show updated keywords
+        await loadMasterCatalog();
+
+      } catch (error) {
+        alert(`Error updating keywords: ${error.message}`);
+        console.error('Error updating keywords:', error);
       }
     }
 
@@ -1531,6 +1813,94 @@
     }
 
     // Delete item from catalog
+    async function applyCatalogCOGS(catalogId) {
+      const input = document.getElementById(`cogs-input-${catalogId}`);
+      const applyBtn = document.getElementById(`apply-cogs-btn-${catalogId}`);
+      const cogsValue = parseFloat(input.value);
+
+      if (!cogsValue || cogsValue <= 0) {
+        alert('Please enter a valid COGS amount');
+        return;
+      }
+
+      const product = catalogProducts.find(p => p.id === catalogId);
+      if (!product) {
+        alert('Product not found');
+        return;
+      }
+
+      if (!confirm(`Apply COGS of $${cogsValue.toFixed(2)} to all ${product.sales} "${product.name}" transactions?\n\nThis will:\n1. Create a COGS mapping rule\n2. Apply the cost to all matching transactions\n3. Lock this COGS field`)) {
+        return;
+      }
+
+      // Disable button while processing
+      applyBtn.disabled = true;
+      applyBtn.textContent = 'Applying...';
+
+      try {
+        // Create COGS rule and apply to catalog item
+        const res = await fetch(`${apiBase}/product-catalog/save-cogs`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            product_id: catalogId,
+            cogs: cogsValue,
+            keywords: product.keywords,
+            product_name: product.name
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          const errorMessage = error.detail || error.message || JSON.stringify(error);
+          throw new Error(errorMessage);
+        }
+
+        const result = await res.json();
+
+        // Lock the input field
+        input.disabled = true;
+        input.style.background = '#1e293b';
+        input.style.border = '1px solid #475569';
+
+        // Change button to "Edit"
+        applyBtn.textContent = '✓ Applied';
+        applyBtn.style.background = '#475569';
+        applyBtn.onclick = () => unlockCatalogCOGS(catalogId);
+        applyBtn.title = 'Click to edit COGS';
+
+        alert(`✅ Success!\n\nCOGS rule created: ${result.message}\nApplied $${cogsValue.toFixed(2)} to ${product.sales} transactions`);
+
+        // Reload catalog to show updated counts
+        await loadMasterCatalog();
+
+      } catch (error) {
+        alert(`Error applying COGS: ${error.message}`);
+        applyBtn.disabled = false;
+        applyBtn.textContent = 'Apply COGS';
+      }
+    }
+
+    function unlockCatalogCOGS(catalogId) {
+      const input = document.getElementById(`cogs-input-${catalogId}`);
+      const applyBtn = document.getElementById(`apply-cogs-btn-${catalogId}`);
+
+      // Unlock the input
+      input.disabled = false;
+      input.style.background = '#0f172a';
+      input.style.border = '1px solid #334155';
+      input.focus();
+
+      // Change button back to "Apply COGS"
+      applyBtn.textContent = 'Apply COGS';
+      applyBtn.style.background = '#22c55e';
+      applyBtn.onclick = () => applyCatalogCOGS(catalogId);
+      applyBtn.title = `Apply COGS to all transactions`;
+    }
+
     async function deleteCatalogItem(itemId, itemName) {
       if (!confirm(`Are you sure you want to delete "${itemName}" from the catalog?\n\nThis will only remove it from the Master Catalog. Existing COGS rules will not be affected.`)) {
         return;

@@ -108,6 +108,12 @@ class SalesTransaction(SQLModel, table=True):
     # COGS rule tracking
     matched_cogs_rule_id: Optional[int] = Field(default=None, foreign_key="cogs_mapping_rules.id")
 
+    # Master Catalog mapping tracking
+    catalog_item_id: Optional[int] = Field(default=None, foreign_key="product_catalog.id", index=True)
+    is_mapped: bool = Field(default=False, index=True)  # Quick filter for mapped vs unmapped
+    matched_keyword: Optional[str] = None  # Which keyword caused the match
+    mapped_at: Optional[datetime] = None  # When it was mapped
+
     # Metadata
     row_number: Optional[int] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -258,6 +264,11 @@ class ProductCatalog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     created_by: Optional[int] = None  # Admin user ID
+
+    # Relationships
+    mapped_transactions: List["SalesTransaction"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[SalesTransaction.catalog_item_id]"}
+    )
 
 
 # === PYDANTIC SCHEMAS (for API responses) ===

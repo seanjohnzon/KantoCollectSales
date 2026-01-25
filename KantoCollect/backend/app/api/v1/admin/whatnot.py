@@ -666,20 +666,60 @@ async def get_product_catalog(
     # Get all transactions for matching
     transactions = db.exec(select(SalesTransaction)).all()
 
-    # Build response
+    # First pass: For each transaction, find the BEST match (longest/most specific keyword)
+    # This ensures "surging sparks etb + booster bundle" beats "surging sparks etb"
+    # "Unmapped Items" is excluded from normal matching and only catches leftovers
+    transaction_matches = {}  # transaction_id -> catalog_item_id
+
+    for t in transactions:
+        item_name_lower = t.item_name.lower()
+        best_match = None
+        best_keyword_length = 0
+        best_is_unmapped = False
+
+        for catalog_item in catalog_items:
+            # Check if this is the "Unmapped Items" catalog
+            is_unmapped = catalog_item.name == "Unmapped Items"
+
+            for keyword in catalog_item.keywords:
+                keyword_lower = keyword.lower()
+                if keyword_lower in item_name_lower:
+                    keyword_len = len(keyword_lower)
+
+                    # Pick the best match using these rules:
+                    # 1. Longer keyword always wins
+                    # 2. If same length, non-Unmapped Items wins
+                    # 3. If both unmapped or both not unmapped, keep the first match
+                    should_update = False
+
+                    if keyword_len > best_keyword_length:
+                        # Longer keyword always wins
+                        should_update = True
+                    elif keyword_len == best_keyword_length:
+                        # Same length - prefer non-Unmapped Items
+                        if best_is_unmapped and not is_unmapped:
+                            # Current best is Unmapped, this one isn't - take it
+                            should_update = True
+
+                    if should_update:
+                        best_match = catalog_item.id
+                        best_keyword_length = keyword_len
+                        best_is_unmapped = is_unmapped
+
+        if best_match:
+            transaction_matches[t.id] = best_match
+
+    # Second pass: Count matches for each catalog item
     products = []
     for item in catalog_items:
-        # Count sales that match keywords
         sales = 0
         revenue = 0.0
 
         for t in transactions:
-            item_name_lower = t.item_name.lower()
-            for keyword in item.keywords:
-                if keyword.lower() in item_name_lower:
-                    sales += 1
-                    revenue += float(t.gross_sale_price)
-                    break
+            # Check if this transaction matched this catalog item
+            if transaction_matches.get(t.id) == item.id:
+                sales += 1
+                revenue += float(t.gross_sale_price)
 
         products.append({
             "id": item.id,
@@ -707,7 +747,7 @@ async def save_product_cogs(
     keywords: List[str] = Body(...),
     product_name: str = Body(...),
 ) -> dict:
-    """Save product COGS and create keyword rule."""
+    """Save product COGS and create keyword rule, then apply to all matching transactions."""
     from decimal import Decimal
     from app.models.whatnot import COGSMappingRule, MatchType
 
@@ -724,6 +764,7 @@ async def save_product_cogs(
         existing_rule.cogs_amount = Decimal(str(cogs))
         existing_rule.is_active = True
         db.add(existing_rule)
+        rule_id = existing_rule.id
     else:
         # Create new rule
         rule = COGSMappingRule(
@@ -737,12 +778,56 @@ async def save_product_cogs(
             notes=f"Auto-generated from product catalog"
         )
         db.add(rule)
+        db.flush()  # Get the rule ID
+        rule_id = rule.id
+
+    # Apply COGS to all matching transactions
+    all_transactions = db.exec(select(SalesTransaction)).all()
+    cogs_decimal = Decimal(str(cogs))
+    matched_count = 0
+    affected_show_ids = set()
+
+    for t in all_transactions:
+        item_name_lower = t.item_name.lower()
+        for keyword in keywords:
+            if keyword.lower() in item_name_lower:
+                # Calculate COGS (cogs per item * quantity)
+                t.cogs = cogs_decimal * t.quantity
+                t.matched_cogs_rule_id = rule_id
+
+                # Calculate profit and ROI
+                if t.net_earnings:
+                    t.net_profit = t.net_earnings - t.cogs
+                    if t.cogs > 0:
+                        t.roi_percent = (t.net_profit / t.cogs) * 100
+
+                db.add(t)
+                matched_count += 1
+
+                # Track which shows need totals recalculated
+                if t.show_id:
+                    affected_show_ids.add(t.show_id)
+                break
+
+    # Recalculate show totals for affected shows
+    for show_id in affected_show_ids:
+        show = db.get(WhatnotShow, show_id)
+        if show:
+            # Get all transactions for this show
+            show_transactions = db.exec(
+                select(SalesTransaction).where(SalesTransaction.show_id == show_id)
+            ).all()
+
+            # Recalculate totals
+            show.total_cogs = sum(t.cogs or Decimal("0") for t in show_transactions)
+            show.total_net_profit = sum(t.net_profit or Decimal("0") for t in show_transactions)
+            db.add(show)
 
     db.commit()
 
     return {
         "success": True,
-        "message": f"COGS rule created for {product_name}"
+        "message": f"COGS rule created for {product_name}. Applied to {matched_count} transactions."
     }
 
 
@@ -869,6 +954,30 @@ async def add_catalog_item(
     return ProductCatalogRead.model_validate(catalog_item)
 
 
+@router.patch("/product-catalog/{item_id}")
+async def update_catalog_item(
+    item_id: int,
+    payload: ProductCatalogUpdate,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> ProductCatalogRead:
+    """Update catalog item (keywords, name, category, etc.)."""
+    item = db.get(ProductCatalog, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    # Update fields that are provided
+    update_data = payload.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(item, field, value)
+
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    return ProductCatalogRead.model_validate(item)
+
+
 @router.delete("/product-catalog/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_catalog_item(
     item_id: int,
@@ -891,3 +1000,98 @@ async def get_analytics_rule_performance(
 ) -> List[dict]:
     """Get COGS rule performance statistics."""
     return get_rule_performance(db)
+
+
+@router.post("/product-catalog/{catalog_id}/mark-mapped")
+async def mark_catalog_item_mapped(
+    catalog_id: int,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """
+    Mark all transactions matching this catalog item as 'mapped'.
+    Call this after user reviews and confirms the keyword matches are correct.
+    """
+    from datetime import datetime
+
+    # Get catalog item
+    catalog_item = db.get(ProductCatalog, catalog_id)
+    if not catalog_item:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    # Find all transactions that match this catalog item's keywords
+    all_transactions = db.exec(select(SalesTransaction)).all()
+
+    mapped_count = 0
+    for t in all_transactions:
+        # Skip if already mapped to another catalog item
+        if t.is_mapped and t.catalog_item_id != catalog_id:
+            continue
+
+        item_name_lower = t.item_name.lower()
+        matched = False
+        matched_kw = None
+
+        for keyword in catalog_item.keywords:
+            if keyword.lower() in item_name_lower:
+                # Mark as mapped
+                t.catalog_item_id = catalog_id
+                t.is_mapped = True
+                t.matched_keyword = keyword
+                t.mapped_at = datetime.utcnow()
+                db.add(t)
+                matched_count += 1
+                matched = True
+                break
+
+    db.commit()
+
+    return {
+        "success": True,
+        "catalog_item": catalog_item.name,
+        "transactions_mapped": mapped_count
+    }
+
+
+@router.get("/analytics/mapping-status")
+async def get_mapping_status(
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """Get overview of mapped vs unmapped transactions."""
+    from sqlmodel import func
+
+    # Total transactions
+    total = db.exec(select(func.count(SalesTransaction.id))).one()
+
+    # Mapped transactions
+    mapped = db.exec(
+        select(func.count(SalesTransaction.id))
+        .where(SalesTransaction.is_mapped == True)
+    ).one()
+
+    # Unmapped transactions
+    unmapped = total - mapped
+
+    # Get unmapped transaction samples (first 10)
+    unmapped_samples = db.exec(
+        select(SalesTransaction)
+        .where(SalesTransaction.is_mapped == False)
+        .limit(10)
+    ).all()
+
+    return {
+        "total_transactions": total,
+        "mapped": mapped,
+        "unmapped": unmapped,
+        "mapping_percentage": round((mapped / total * 100), 2) if total > 0 else 0,
+        "unmapped_samples": [
+            {
+                "id": t.id,
+                "item_name": t.item_name,
+                "show_id": t.show_id,
+                "price": float(t.gross_sale_price)
+            }
+            for t in unmapped_samples
+        ]
+    }
