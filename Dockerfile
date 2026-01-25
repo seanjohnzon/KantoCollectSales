@@ -12,11 +12,5 @@ COPY . .
 # Set working directory to backend
 WORKDIR /app/KantoCollect/backend
 
-# Expose port
-EXPOSE 8000
-
-# Railway sets PORT env var
-ENV PORT=8000
-
-# Start command - use shell form to expand $PORT
-CMD python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+# Start command - Railway sets PORT env var dynamically
+CMD python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
