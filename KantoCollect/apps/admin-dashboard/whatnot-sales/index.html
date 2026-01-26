@@ -171,12 +171,13 @@
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">Revenue</th>
                 <th id="keywords-header" style="padding:12px 8px; font-weight:600; display:none;">Keywords</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:right;">COGS ($)</th>
+                <th id="catalog-owner-header" style="padding:12px 8px; font-weight:600; display:none;">Owner</th>
                 <th style="padding:12px 8px; font-weight:600; text-align:center; width:80px;">Actions</th>
               </tr>
             </thead>
             <tbody id="catalogTableBody">
               <tr>
-                <td colspan="8" style="padding:20px; text-align:center;" class="muted">Loading master catalog...</td>
+                <td colspan="9" style="padding:20px; text-align:center;" class="muted">Loading master catalog...</td>
               </tr>
             </tbody>
           </table>
@@ -491,16 +492,28 @@
 
         <!-- Transactions by Owner -->
         <div style="margin-top:24px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
             <h3 style="margin:0;">Transactions</h3>
-            <select id="ownerFilter" onchange="loadOwnerTransactions()" style="padding:8px 12px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px;">
-              <option value="all">All Owners</option>
-              <option value="Cihan">Cihan</option>
-              <option value="Nima">Nima</option>
-              <option value="Askar">Askar</option>
-              <option value="Kanto">Kanto</option>
-              <option value="Unassigned">Unassigned</option>
-            </select>
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label style="font-size:12px; color:#94a3b8;">Catalog Item:</label>
+                <select id="ownerCatalogFilter" onchange="loadOwnerTransactions()" style="padding:8px 12px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; max-width:200px;">
+                  <option value="all">All Items</option>
+                  <!-- Catalog items will be populated dynamically -->
+                </select>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label style="font-size:12px; color:#94a3b8;">Owner:</label>
+                <select id="ownerFilter" onchange="loadOwnerTransactions()" style="padding:8px 12px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px;">
+                  <option value="all">All Owners</option>
+                  <option value="Cihan">Cihan</option>
+                  <option value="Nima">Nima</option>
+                  <option value="Askar">Askar</option>
+                  <option value="Kanto">Kanto</option>
+                  <option value="Unassigned">Unassigned</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div style="overflow-x:auto;">
@@ -509,6 +522,7 @@
                 <tr style="background:#1f2937; text-align:left; border-bottom:2px solid #22c55e;">
                   <th style="padding:12px 8px; font-weight:600;">Date</th>
                   <th style="padding:12px 8px; font-weight:600;">Item</th>
+                  <th style="padding:12px 8px; font-weight:600;">Catalog</th>
                   <th style="padding:12px 8px; font-weight:600;">Source</th>
                   <th style="padding:12px 8px; font-weight:600; text-align:right;">Revenue</th>
                   <th style="padding:12px 8px; font-weight:600; text-align:right;">Earnings</th>
@@ -520,7 +534,7 @@
               </thead>
               <tbody id="ownerTransactionsBody">
                 <tr>
-                  <td colspan="9" style="padding:20px; text-align:center;" class="muted">Loading...</td>
+                  <td colspan="10" style="padding:20px; text-align:center;" class="muted">Loading...</td>
                 </tr>
               </tbody>
             </table>
@@ -646,6 +660,13 @@
       // Show/hide Keywords column in Master Catalog
       const keywordsHeader = document.getElementById('keywords-header');
       if (keywordsHeader) keywordsHeader.style.display = adminEnabled ? 'table-cell' : 'none';
+
+      // Show/hide Owner column in Master Catalog
+      const catalogOwnerHeader = document.getElementById('catalog-owner-header');
+      if (catalogOwnerHeader) catalogOwnerHeader.style.display = adminEnabled ? 'table-cell' : 'none';
+      document.querySelectorAll('.catalog-owner-column').forEach(col => {
+        col.style.display = adminEnabled ? 'table-cell' : 'none';
+      });
 
       // Show/hide Owner assignment section in Shows tab
       const assignOwnerSection = document.getElementById('assignOwnerSection');
@@ -1781,7 +1802,7 @@
 
         if (!res.ok) {
           const error = await res.json();
-          tbody.innerHTML = `<tr><td colspan="8" style="padding:20px; text-align:center;" class="danger">❌ Error loading products: ${error.detail || res.statusText}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="9" style="padding:20px; text-align:center;" class="danger">❌ Error loading products: ${error.detail || res.statusText}</td></tr>`;
           console.error('Product catalog error:', error);
           return;
         }
@@ -1790,7 +1811,7 @@
         console.log('Product catalog loaded:', data);
 
         if (!data.products || data.products.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center;" class="warning">⚠ No products found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="warning">⚠ No products found</td></tr>';
           return;
         }
 
@@ -1972,6 +1993,27 @@
                   <div class="muted" style="text-align:right; font-size:12px;">Read-only</div>
                 `}
               </td>
+              <td class="catalog-owner-column" style="padding:12px 8px; display:${adminEnabled ? 'table-cell' : 'none'};">
+                ${adminEnabled ? `
+                  <div style="display:flex; align-items:center; gap:4px;">
+                    <select id="catalog-owner-${p.id}"
+                            style="flex:1; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:12px;">
+                      <option value="">Unassigned</option>
+                      <option value="Cihan">Cihan</option>
+                      <option value="Nima">Nima</option>
+                      <option value="Askar">Askar</option>
+                      <option value="Kanto">Kanto</option>
+                    </select>
+                    <button onclick="assignOwnerToCatalogItem(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
+                            style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px; white-space:nowrap;"
+                            title="Assign owner to all ${p.sales} matched transactions">
+                      Apply
+                    </button>
+                  </div>
+                ` : `
+                  <div class="muted" style="font-size:12px;">-</div>
+                `}
+              </td>
               <td style="padding:12px 8px; text-align:center;">
                 ${adminEnabled ? `
                   <button onclick="deleteCatalogItem(${p.id}, '${p.name.replace(/'/g, "\\'")}')"
@@ -1991,7 +2033,7 @@
             const matches = catalogTransactions[p.id];
             rows.push(`
               <tr style="background:#0f172a;">
-                <td colspan="8" style="padding:16px 24px;">
+                <td colspan="9" style="padding:16px 24px;">
                   <div style="font-size:13px; font-weight:600; margin-bottom:12px; color:#94a3b8;">
                     📋 ${matches.length} Matched Transactions
                   </div>
@@ -2004,6 +2046,7 @@
                           <th style="padding:8px; text-align:left; color:#94a3b8;">Show</th>
                           <th style="padding:8px; text-align:right; color:#94a3b8;">Price</th>
                           ${adminEnabled ? '<th style="padding:8px; text-align:left; color:#94a3b8;">Matched Keyword</th>' : ''}
+                          ${adminEnabled ? '<th style="padding:8px; text-align:left; color:#94a3b8;">Owner</th>' : ''}
                           <th style="padding:8px; text-align:center; color:#94a3b8;">Actions</th>
                         </tr>
                       </thead>
@@ -2018,6 +2061,24 @@
                               <td style="padding:8px; color:#64748b;">${m.sale_type === 'marketplace' ? 'Marketplace' : (m.show_name || 'Show #' + m.show_id)}</td>
                               <td style="padding:8px; text-align:right; color:#22c55e;">$${parseFloat(m.gross_sale_price || 0).toFixed(2)}</td>
                               ${adminEnabled ? `<td style="padding:8px; font-size:11px; color:#f59e0b;">"${matchedKeyword}"</td>` : ''}
+                              ${adminEnabled ? `
+                              <td style="padding:8px;">
+                                <div style="display:flex; align-items:center; gap:4px;">
+                                  <select id="catalog-match-owner-${m.id}"
+                                          style="padding:3px 4px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:11px;">
+                                    <option value="" ${!m.owner ? 'selected' : ''}>Unassigned</option>
+                                    <option value="Cihan" ${m.owner === 'Cihan' ? 'selected' : ''}>Cihan</option>
+                                    <option value="Nima" ${m.owner === 'Nima' ? 'selected' : ''}>Nima</option>
+                                    <option value="Askar" ${m.owner === 'Askar' ? 'selected' : ''}>Askar</option>
+                                    <option value="Kanto" ${m.owner === 'Kanto' ? 'selected' : ''}>Kanto</option>
+                                  </select>
+                                  <button onclick="assignOwnerFromCatalog(${m.id}, ${p.id})"
+                                          style="padding:3px 6px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px;">
+                                    Apply
+                                  </button>
+                                </div>
+                              </td>
+                              ` : ''}
                               <td style="padding:8px; text-align:center;">
                                 ${m.sale_type === 'marketplace'
                                   ? `<button onclick="navigateToMarketplace(${m.id})"
@@ -2045,7 +2106,7 @@
         tbody.innerHTML = rows.join('');
 
       } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="8" style="padding:20px; text-align:center;" class="danger">❌ Error: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="padding:20px; text-align:center;" class="danger">❌ Error: ${error.message}</td></tr>`;
         console.error('Failed to load catalog:', error);
       }
     }
@@ -2161,6 +2222,138 @@
       } catch (error) {
         console.error('Error fetching matches:', error);
         catalogTransactions[productId] = [];
+      }
+    }
+
+    // Assign owner to all transactions matching a catalog item
+    async function assignOwnerToCatalogItem(productId, productName) {
+      const ownerSelect = document.getElementById(`catalog-owner-${productId}`);
+      const owner = ownerSelect ? ownerSelect.value : '';
+
+      if (!owner) {
+        alert('Please select an owner first');
+        return;
+      }
+
+      // Make sure we have the matched transactions
+      if (!catalogTransactions[productId]) {
+        await fetchCatalogMatches(productId);
+      }
+
+      const matches = catalogTransactions[productId] || [];
+
+      if (matches.length === 0) {
+        alert(`No matched transactions found for "${productName}"`);
+        return;
+      }
+
+      if (!confirm(`Assign "${owner}" as owner to all ${matches.length} transactions matching "${productName}"?`)) {
+        return;
+      }
+
+      try {
+        let successCount = 0;
+        let errorCount = 0;
+
+        // Show progress - find button by its neighboring select element
+        const selectEl = document.getElementById(`catalog-owner-${productId}`);
+        const button = selectEl ? selectEl.nextElementSibling : null;
+        const originalText = button ? button.textContent : 'Apply';
+        if (button) {
+          button.disabled = true;
+          button.textContent = '...';
+        }
+
+        // Assign owner to each transaction
+        for (const t of matches) {
+          try {
+            const res = await fetch(`${apiBase}/transactions/${t.id}/owner`, {
+              method: 'PUT',
+              headers: {
+                ...authHeaders(),
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(owner),
+            });
+
+            if (res.ok) {
+              successCount++;
+            } else {
+              errorCount++;
+            }
+          } catch (e) {
+            errorCount++;
+          }
+
+          // Update button with progress
+          if (button) {
+            button.textContent = `${successCount}/${matches.length}`;
+          }
+        }
+
+        // Restore button
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+
+        // Clear cache so it reloads with new owner data
+        delete catalogTransactions[productId];
+
+        alert(`✅ Assigned "${owner}" to ${successCount} transactions${errorCount > 0 ? ` (${errorCount} errors)` : ''}`);
+
+        // Reload catalog to reflect changes
+        await loadMasterCatalog();
+
+      } catch (error) {
+        console.error('Failed to assign owner to catalog item:', error);
+        alert('Failed to assign owner: ' + error.message);
+      }
+    }
+
+    // Assign owner to a single transaction from catalog expanded view
+    async function assignOwnerFromCatalog(transactionId, catalogItemId) {
+      const ownerSelect = document.getElementById(`catalog-match-owner-${transactionId}`);
+      const owner = ownerSelect ? ownerSelect.value : '';
+
+      try {
+        const res = await fetch(`${apiBase}/transactions/${transactionId}/owner`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(owner || null),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ detail: res.statusText }));
+          throw new Error(errorData.detail || 'Failed to assign owner');
+        }
+
+        // Update the cached transaction data
+        if (catalogTransactions[catalogItemId]) {
+          const txn = catalogTransactions[catalogItemId].find(t => t.id === transactionId);
+          if (txn) {
+            txn.owner = owner || null;
+          }
+        }
+
+        // Brief visual feedback
+        const button = ownerSelect.nextElementSibling;
+        if (button) {
+          const originalText = button.textContent;
+          button.textContent = '✓';
+          button.style.background = '#22c55e';
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.style.background = '#3b82f6';
+          }, 1000);
+        }
+
+      } catch (error) {
+        console.error('Failed to assign owner:', error);
+        alert('Failed to assign owner: ' + error.message);
       }
     }
 
@@ -3107,6 +3300,18 @@
 
     async function loadOwners() {
       try {
+        // Load catalog items for filter dropdown
+        const catalogRes = await fetch(`${apiBase}/product-catalog`, { headers: authHeaders() });
+        if (catalogRes.ok) {
+          const catalogData = await catalogRes.json();
+          const catalogFilter = document.getElementById('ownerCatalogFilter');
+          if (catalogFilter && catalogData.products) {
+            // Keep "All Items" and add catalog items
+            catalogFilter.innerHTML = '<option value="all">All Items</option>' +
+              catalogData.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+          }
+        }
+
         // Load owner summary
         const summaryRes = await fetch(`${apiBase}/owners/summary`, { headers: authHeaders() });
         const summaryData = await summaryRes.json();
@@ -3167,6 +3372,7 @@
 
     async function loadOwnerTransactions() {
       const filter = document.getElementById('ownerFilter').value;
+      const catalogFilter = document.getElementById('ownerCatalogFilter').value;
       const tbody = document.getElementById('ownerTransactionsBody');
 
       try {
@@ -3195,6 +3401,66 @@
           transactions = data.transactions;
         }
 
+        // Filter by catalog item if selected
+        if (catalogFilter !== 'all') {
+          const catalogId = parseInt(catalogFilter);
+          // Load catalog items to get matching rules
+          const catalogRes = await fetch(`${apiBase}/product-catalog`, { headers: authHeaders() });
+          if (catalogRes.ok) {
+            const catalogData = await catalogRes.json();
+            const selectedCatalog = catalogData.products.find(p => p.id === catalogId);
+
+            if (selectedCatalog) {
+              // Sort catalog by priority for proper matching
+              const sortedCatalog = [...catalogData.products].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+              const catchAllItem = sortedCatalog.find(item => item.ruleType === 'catch_all');
+
+              // Filter transactions that match this catalog item
+              transactions = transactions.filter(t => {
+                const itemNameLower = t.item_name.toLowerCase();
+                let matchedItemId = null;
+
+                // Try to match against catalog items (ordered by priority)
+                for (const catalogItem of sortedCatalog) {
+                  if (catalogItem.ruleType === 'catch_all') continue;
+
+                  let match = false;
+
+                  if (catalogItem.ruleType === 'include_all') {
+                    match = catalogItem.includeKeywords && catalogItem.includeKeywords.every(
+                      kw => itemNameLower.includes(kw.toLowerCase())
+                    );
+                  } else if (catalogItem.ruleType === 'include_any') {
+                    match = catalogItem.includeKeywords && catalogItem.includeKeywords.some(
+                      kw => itemNameLower.includes(kw.toLowerCase())
+                    );
+                  } else if (catalogItem.ruleType === 'include_and_exclude') {
+                    const hasInclude = catalogItem.includeKeywords && catalogItem.includeKeywords.some(
+                      kw => itemNameLower.includes(kw.toLowerCase())
+                    );
+                    const hasExclude = catalogItem.excludeKeywords && catalogItem.excludeKeywords.some(
+                      kw => itemNameLower.includes(kw.toLowerCase())
+                    );
+                    match = hasInclude && !hasExclude;
+                  }
+
+                  if (match) {
+                    matchedItemId = catalogItem.id;
+                    break;
+                  }
+                }
+
+                // If no match and there's a catch-all, use it
+                if (!matchedItemId && catchAllItem) {
+                  matchedItemId = catchAllItem.id;
+                }
+
+                return matchedItemId === catalogId;
+              });
+            }
+          }
+        }
+
         if (transactions.length === 0) {
           tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="muted">No transactions found</td></tr>';
           return;
@@ -3202,6 +3468,50 @@
 
         // Sort by date descending
         transactions.sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date));
+
+        // Load catalog for matching
+        let catalogItems = [];
+        let sortedCatalog = [];
+        let catchAllItem = null;
+        try {
+          const catRes = await fetch(`${apiBase}/product-catalog`, { headers: authHeaders() });
+          if (catRes.ok) {
+            const catData = await catRes.json();
+            catalogItems = catData.products || [];
+            sortedCatalog = [...catalogItems].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+            catchAllItem = sortedCatalog.find(item => item.ruleType === 'catch_all');
+          }
+        } catch (e) {
+          console.error('Failed to load catalog for matching:', e);
+        }
+
+        // Function to find matching catalog item for a transaction
+        function findMatchingCatalog(itemName) {
+          const itemNameLower = itemName.toLowerCase();
+          for (const catalogItem of sortedCatalog) {
+            if (catalogItem.ruleType === 'catch_all') continue;
+            let match = false;
+            if (catalogItem.ruleType === 'include_all') {
+              match = catalogItem.includeKeywords && catalogItem.includeKeywords.every(
+                kw => itemNameLower.includes(kw.toLowerCase())
+              );
+            } else if (catalogItem.ruleType === 'include_any') {
+              match = catalogItem.includeKeywords && catalogItem.includeKeywords.some(
+                kw => itemNameLower.includes(kw.toLowerCase())
+              );
+            } else if (catalogItem.ruleType === 'include_and_exclude') {
+              const hasInclude = catalogItem.includeKeywords && catalogItem.includeKeywords.some(
+                kw => itemNameLower.includes(kw.toLowerCase())
+              );
+              const hasExclude = catalogItem.excludeKeywords && catalogItem.excludeKeywords.some(
+                kw => itemNameLower.includes(kw.toLowerCase())
+              );
+              match = hasInclude && !hasExclude;
+            }
+            if (match) return catalogItem;
+          }
+          return catchAllItem || null;
+        }
 
         tbody.innerHTML = transactions.map(t => {
           const date = new Date(t.transaction_date).toLocaleDateString();
@@ -3211,11 +3521,14 @@
           const profit = cogs > 0 ? earnings - cogs : 0;
           const profitColor = profit > 0 ? '#22c55e' : profit < 0 ? '#ef4444' : '#94a3b8';
           const source = t.sale_type === 'marketplace' ? '🛒 Marketplace' : `🎬 ${t.show_name || 'Show #' + t.show_id}`;
+          const matchedCatalog = findMatchingCatalog(t.item_name);
+          const catalogName = matchedCatalog ? matchedCatalog.name : '(Unmatched)';
 
           return `
             <tr style="border-bottom:1px solid #1f2937;">
               <td style="padding:12px 8px;">${date}</td>
               <td style="padding:12px 8px;">${t.item_name}</td>
+              <td style="padding:12px 8px; color:#8b5cf6; font-size:11px;">${catalogName}</td>
               <td style="padding:12px 8px; color:#64748b; font-size:12px;">${source}</td>
               <td style="padding:12px 8px; text-align:right;">$${revenue.toFixed(2)}</td>
               <td style="padding:12px 8px; text-align:right; color:#22c55e;">$${earnings.toFixed(2)}</td>
@@ -3260,7 +3573,7 @@
 
       } catch (error) {
         console.error('Failed to load owner transactions:', error);
-        tbody.innerHTML = '<tr><td colspan="9" style="padding:20px; text-align:center;" class="danger">Failed to load transactions</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding:20px; text-align:center;" class="danger">Failed to load transactions</td></tr>';
       }
     }
 
