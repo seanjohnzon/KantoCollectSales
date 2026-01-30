@@ -671,7 +671,7 @@ def import_marketplace_excel(
                 rule_id, cogs_amount = match_cogs_rule(session, normalized_name)
 
                 if rule_id and cogs_amount:
-                    apply_cogs_to_transaction(transaction, cogs_amount, quantity, rule_id)
+                    apply_cogs_to_transaction(transaction, cogs_amount, rule_id)
                     cogs_assigned += 1
 
             elif transaction.cogs is not None:

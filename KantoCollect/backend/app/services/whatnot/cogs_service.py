@@ -33,6 +33,10 @@ def normalize_product_name(name: str) -> str:
     Returns:
         Normalized lowercase string with special chars removed
     """
+    # Handle None or empty name
+    if not name:
+        return ""
+
     # Convert to lowercase
     normalized = name.lower().strip()
 
@@ -75,9 +79,17 @@ def match_cogs_rule(
 
     # Check each rule in priority order
     for rule in rules:
+        # Skip rules with no keywords
+        if not rule.keywords:
+            continue
+
         # Check each keyword in the rule
         for keyword in rule.keywords:  # JSON array of strings
             keyword_normalized = keyword.lower().strip()
+
+            # Skip empty keywords (would match everything)
+            if not keyword_normalized:
+                continue
 
             # Match based on rule's match_type
             if rule.match_type == MatchType.CONTAINS:
@@ -165,9 +177,17 @@ def test_rule_against_products(
         # Normalize product name
         normalized = normalize_product_name(product.product_name)
 
+        # Skip if no keywords in rule
+        if not rule.keywords:
+            break
+
         # Check if any keyword matches
         for keyword in rule.keywords:
             keyword_normalized = keyword.lower().strip()
+
+            # Skip empty keywords
+            if not keyword_normalized:
+                continue
 
             matched = False
             if rule.match_type == MatchType.CONTAINS:

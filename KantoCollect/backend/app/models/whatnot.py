@@ -296,6 +296,64 @@ class ProductCatalog(SQLModel, table=True):
     mapped_transactions: List["SalesTransaction"] = Relationship(
         sa_relationship_kwargs={"foreign_keys": "[SalesTransaction.catalog_item_id]"}
     )
+    inventory_items: List["WhatnotInventory"] = Relationship(back_populates="catalog_item")
+
+
+class InventoryItemStatus(str, Enum):
+    """Status of inventory item."""
+    IN_STOCK = "in_stock"
+    LOW_STOCK = "low_stock"
+    OUT_OF_STOCK = "out_of_stock"
+    RESERVED = "reserved"
+
+
+class WhatnotInventory(SQLModel, table=True):
+    """
+    Inventory tracking for items the business has on hand.
+    Links to ProductCatalog for product info and images.
+    """
+    __tablename__ = "whatnot_inventory"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Link to catalog item (optional - can have inventory without catalog entry)
+    catalog_item_id: Optional[int] = Field(default=None, foreign_key="product_catalog.id", index=True)
+
+    # Item details (if not linked to catalog)
+    item_name: str = Field(index=True)
+    sku: Optional[str] = Field(default=None, index=True)
+    category: Optional[str] = None
+    image_url: Optional[str] = None  # Custom image if not using catalog
+
+    # Inventory tracking
+    quantity: int = Field(default=0)
+    low_stock_threshold: int = Field(default=5)  # Alert when below this
+    status: InventoryItemStatus = Field(default=InventoryItemStatus.IN_STOCK)
+
+    # Cost tracking
+    cost_per_unit: Optional[Decimal] = Field(default=None)  # What we paid per unit
+    total_cost: Optional[Decimal] = Field(default=None)  # Total investment
+
+    # Location/organization
+    location: Optional[str] = None  # e.g., "Shelf A", "Storage Box 1"
+    bin_number: Optional[str] = None
+
+    # Supplier info
+    supplier: Optional[str] = None
+    last_restock_date: Optional[date] = None
+
+    # Notes
+    notes: Optional[str] = None
+
+    # Owner assignment
+    owner: Optional[str] = Field(default=None, index=True)  # Cihan, Nima, Askar, Kanto
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    catalog_item: Optional[ProductCatalog] = Relationship(back_populates="inventory_items")
 
 
 # === PYDANTIC SCHEMAS (for API responses) ===
@@ -486,3 +544,73 @@ class ProductCatalogUpdate(SQLModel):
     exclude_keywords: Optional[List[str]] = None
     priority: Optional[int] = None
     keywords: Optional[List[str]] = None  # DEPRECATED: Keep for backward compatibility
+
+
+# === INVENTORY SCHEMAS ===
+
+class InventoryRead(SQLModel):
+    """Read schema for inventory item."""
+    id: int
+    catalog_item_id: Optional[int]
+    item_name: str
+    sku: Optional[str]
+    category: Optional[str]
+    image_url: Optional[str]
+    quantity: int
+    low_stock_threshold: int
+    status: InventoryItemStatus
+    cost_per_unit: Optional[Decimal]
+    total_cost: Optional[Decimal]
+    location: Optional[str]
+    bin_number: Optional[str]
+    supplier: Optional[str]
+    last_restock_date: Optional[date]
+    notes: Optional[str]
+    owner: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    # From catalog if linked
+    catalog_name: Optional[str] = None
+    catalog_image_url: Optional[str] = None
+    catalog_category: Optional[str] = None
+
+
+class InventoryCreate(SQLModel):
+    """Create schema for inventory item."""
+    catalog_item_id: Optional[int] = None
+    item_name: str
+    sku: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    quantity: int = 0
+    low_stock_threshold: int = 5
+    cost_per_unit: Optional[Decimal] = None
+    location: Optional[str] = None
+    bin_number: Optional[str] = None
+    supplier: Optional[str] = None
+    notes: Optional[str] = None
+    owner: Optional[str] = None
+
+
+class InventoryUpdate(SQLModel):
+    """Update schema for inventory item."""
+    catalog_item_id: Optional[int] = None
+    item_name: Optional[str] = None
+    sku: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    quantity: Optional[int] = None
+    low_stock_threshold: Optional[int] = None
+    cost_per_unit: Optional[Decimal] = None
+    location: Optional[str] = None
+    bin_number: Optional[str] = None
+    supplier: Optional[str] = None
+    last_restock_date: Optional[date] = None
+    notes: Optional[str] = None
+    owner: Optional[str] = None
+
+
+class InventoryAdjustment(SQLModel):
+    """Schema for adjusting inventory quantity."""
+    adjustment: int  # Positive to add, negative to remove
+    reason: Optional[str] = None  # e.g., "Sold on stream", "Damaged", "Restock"

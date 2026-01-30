@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core.inventory_database import init_inventory_db
 from app.core.whatnot_database import init_whatnot_db
+from app.core.whatnot_test_database import init_whatnot_test_db
 from app.api.v1.router import api_router
 
 # Static files directory (backend/app/main.py -> KantoCollect/apps/admin-dashboard)
@@ -37,6 +38,8 @@ async def lifespan(app: FastAPI):
     print("✅ Inventory database initialized")
     init_whatnot_db()
     print("✅ WhatNot sales database initialized")
+    init_whatnot_test_db()
+    print("✅ WhatNot sales TEST database initialized")
 
     yield
     
@@ -152,3 +155,12 @@ async def add_catalog_items_ui():
     if html_file.exists():
         return FileResponse(html_file, media_type="text/html")
     return {"error": "Tool not found"}
+
+
+@app.get("/whatnot-sales-test")
+async def whatnot_sales_test_ui():
+    """Serve the WhatNot Sales Tracker TEST environment UI."""
+    html_file = STATIC_DIR / "whatnot-sales" / "test.html"
+    if html_file.exists():
+        return FileResponse(html_file, media_type="text/html")
+    return {"message": "WhatNot Sales TEST - Loading..."}

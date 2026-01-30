@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # WhatNot sales database (separate from core and inventory DBs)
     whatnot_database_url: str = "sqlite:///./whatnot_sales.db"
 
+    # WhatNot sales TEST database (for regression testing without affecting production)
+    whatnot_test_database_url: str = "sqlite:///./whatnot_sales_test.db"
+
     # Authentication
     jwt_secret_key: str = "change-this-jwt-secret"
     jwt_algorithm: str = "HS256"

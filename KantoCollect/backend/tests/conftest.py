@@ -1,8 +1,12 @@
 """
 Pytest configuration and fixtures.
+
+Root-level fixtures shared across all test modules.
 """
 
 import asyncio
+import os
+from pathlib import Path
 from typing import AsyncGenerator, Generator
 
 import pytest
@@ -18,8 +22,58 @@ from app.core.security import get_password_hash
 from app.models.user import User, UserRole
 
 
+# Set test environment
+os.environ["APP_ENV"] = "test"
+os.environ["DEBUG"] = "true"
+
 # Test database URL (in-memory SQLite)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+# === Project Paths ===
+
+@pytest.fixture(scope="session")
+def project_root() -> Path:
+    """Return the project root directory."""
+    return Path(__file__).parent.parent
+
+
+@pytest.fixture(scope="session")
+def test_data_dir(project_root: Path) -> Path:
+    """Return the test data directory."""
+    data_dir = project_root / "tests" / "data"
+    data_dir.mkdir(exist_ok=True)
+    return data_dir
+
+
+# === Marker Configuration ===
+
+def pytest_configure(config):
+    """Configure custom markers."""
+    config.addinivalue_line("markers", "admin: Tests requiring admin authentication")
+    config.addinivalue_line("markers", "non_admin: Tests that don't require admin authentication")
+    config.addinivalue_line("markers", "api: API endpoint tests")
+    config.addinivalue_line("markers", "ui: UI browser tests")
+    config.addinivalue_line("markers", "slow: Tests that take longer to run")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Automatically add markers based on test location."""
+    for item in items:
+        # Add api/ui markers based on path
+        if "tests/api" in str(item.fspath):
+            item.add_marker(pytest.mark.api)
+        elif "tests/ui" in str(item.fspath):
+            item.add_marker(pytest.mark.ui)
+
+        # Add admin/non_admin markers based on path
+        if "/admin/" in str(item.fspath):
+            item.add_marker(pytest.mark.admin)
+        elif "/non_admin/" in str(item.fspath):
+            item.add_marker(pytest.mark.non_admin)
+
+
+# === Core Database Fixtures ===
 
 
 @pytest.fixture(scope="session")

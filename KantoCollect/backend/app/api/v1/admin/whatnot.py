@@ -20,6 +20,8 @@ from app.models.whatnot import (
     WhatnotBuyer,
     COGSMappingRule,
     ProductCatalog,
+    WhatnotInventory,
+    InventoryItemStatus,
     ShowRead,
     ShowCreate,
     ShowUpdate,
@@ -35,6 +37,10 @@ from app.models.whatnot import (
     ProductCatalogRead,
     ProductCatalogCreate,
     ProductCatalogUpdate,
+    InventoryRead,
+    InventoryCreate,
+    InventoryUpdate,
+    InventoryAdjustment,
     ImportResult,
 )
 from app.services.whatnot.import_service import import_excel_show
@@ -432,7 +438,7 @@ async def get_owners_summary(
     current_user: OptionalUser,
     db: Session = Depends(get_whatnot_db),
 ) -> dict:
-    """Get summary of transactions grouped by owner."""
+    """Get summary of transactions grouped by owner, including inventory for Kanto."""
     # Get all owners and their transaction counts
     owners_data = {}
 
@@ -455,7 +461,7 @@ async def get_owners_summary(
                 total_cogs += t.cogs
                 total_profit += (t.net_earnings - t.cogs)
 
-        owners_data[owner] = {
+        owner_data = {
             "owner": owner,
             "transaction_count": len(transactions),
             "total_revenue": float(total_revenue),
@@ -463,6 +469,27 @@ async def get_owners_summary(
             "total_cogs": float(total_cogs),
             "total_profit": float(total_profit),
         }
+
+        # Add inventory stats for Kanto (business inventory)
+        if owner == "Kanto":
+            inventory_items = db.exec(
+                select(WhatnotInventory).where(
+                    (WhatnotInventory.owner == "Kanto") | (WhatnotInventory.owner == None)
+                )
+            ).all()
+
+            inv_item_count = len(inventory_items)
+            inv_total_quantity = sum(i.quantity for i in inventory_items)
+            inv_total_value = Decimal("0")
+            for i in inventory_items:
+                if i.cost_per_unit and i.quantity:
+                    inv_total_value += i.cost_per_unit * i.quantity
+
+            owner_data["inventory_item_count"] = inv_item_count
+            owner_data["inventory_total_quantity"] = inv_total_quantity
+            owner_data["inventory_total_value"] = float(inv_total_value)
+
+        owners_data[owner] = owner_data
 
     # Get unassigned count
     unassigned = db.exec(
@@ -1409,4 +1436,446 @@ async def get_mapping_status(
             }
             for t in unmapped_samples
         ]
+    }
+
+
+# === INVENTORY ENDPOINTS ===
+
+def _to_inventory_read(item: WhatnotInventory, catalog: Optional[ProductCatalog] = None) -> InventoryRead:
+    """Convert inventory model to read schema with catalog info."""
+    data = item.model_dump()
+    if catalog:
+        data['catalog_name'] = catalog.name
+        data['catalog_image_url'] = catalog.image_url
+        data['catalog_category'] = catalog.category
+    else:
+        data['catalog_name'] = None
+        data['catalog_image_url'] = None
+        data['catalog_category'] = None
+    return InventoryRead(**data)
+
+
+def _update_inventory_status(item: WhatnotInventory) -> None:
+    """Update inventory status based on quantity and threshold."""
+    if item.quantity <= 0:
+        item.status = InventoryItemStatus.OUT_OF_STOCK
+    elif item.quantity <= item.low_stock_threshold:
+        item.status = InventoryItemStatus.LOW_STOCK
+    else:
+        item.status = InventoryItemStatus.IN_STOCK
+
+
+@router.get("/inventory", response_model=List[InventoryRead])
+async def list_inventory(
+    current_user: OptionalUser,
+    db: Session = Depends(get_whatnot_db),
+    status_filter: Optional[InventoryItemStatus] = None,
+    category: Optional[str] = None,
+    owner: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[InventoryRead]:
+    """List all inventory items with optional filters."""
+    query = select(WhatnotInventory)
+
+    if status_filter:
+        query = query.where(WhatnotInventory.status == status_filter)
+    if category:
+        query = query.where(WhatnotInventory.category == category)
+    if owner:
+        query = query.where(WhatnotInventory.owner == owner)
+    if search:
+        like = f"%{search}%"
+        query = query.where(
+            or_(
+                WhatnotInventory.item_name.ilike(like),
+                WhatnotInventory.sku.ilike(like),
+            )
+        )
+
+    query = query.order_by(WhatnotInventory.item_name).offset(offset).limit(limit)
+    items = db.exec(query).all()
+
+    # Get linked catalog items
+    catalog_ids = [i.catalog_item_id for i in items if i.catalog_item_id]
+    catalogs = {}
+    if catalog_ids:
+        catalog_items = db.exec(
+            select(ProductCatalog).where(ProductCatalog.id.in_(catalog_ids))
+        ).all()
+        catalogs = {c.id: c for c in catalog_items}
+
+    return [_to_inventory_read(item, catalogs.get(item.catalog_item_id)) for item in items]
+
+
+@router.get("/inventory/stats")
+async def get_inventory_stats(
+    current_user: OptionalUser,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """Get inventory statistics summary."""
+    from sqlmodel import func
+
+    items = db.exec(select(WhatnotInventory)).all()
+
+    total_items = len(items)
+    total_quantity = sum(i.quantity for i in items)
+    total_value = sum(
+        float(i.total_cost or 0) if i.total_cost else float(i.cost_per_unit or 0) * i.quantity
+        for i in items
+    )
+
+    in_stock = sum(1 for i in items if i.status == InventoryItemStatus.IN_STOCK)
+    low_stock = sum(1 for i in items if i.status == InventoryItemStatus.LOW_STOCK)
+    out_of_stock = sum(1 for i in items if i.status == InventoryItemStatus.OUT_OF_STOCK)
+
+    # Get categories
+    categories = {}
+    for item in items:
+        cat = item.category or "Uncategorized"
+        if cat not in categories:
+            categories[cat] = {"count": 0, "quantity": 0}
+        categories[cat]["count"] += 1
+        categories[cat]["quantity"] += item.quantity
+
+    return {
+        "total_items": total_items,
+        "total_quantity": total_quantity,
+        "total_value": round(total_value, 2),
+        "in_stock": in_stock,
+        "low_stock": low_stock,
+        "out_of_stock": out_of_stock,
+        "categories": categories,
+    }
+
+
+@router.get("/inventory/{item_id}", response_model=InventoryRead)
+async def get_inventory_item(
+    item_id: int,
+    current_user: OptionalUser,
+    db: Session = Depends(get_whatnot_db),
+) -> InventoryRead:
+    """Get a single inventory item."""
+    item = db.get(WhatnotInventory, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    catalog = None
+    if item.catalog_item_id:
+        catalog = db.get(ProductCatalog, item.catalog_item_id)
+
+    return _to_inventory_read(item, catalog)
+
+
+@router.post("/inventory", response_model=InventoryRead, status_code=status.HTTP_201_CREATED)
+async def create_inventory_item(
+    payload: InventoryCreate,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> InventoryRead:
+    """Create a new inventory item."""
+    # Verify catalog item exists if provided
+    catalog = None
+    if payload.catalog_item_id:
+        catalog = db.get(ProductCatalog, payload.catalog_item_id)
+        if not catalog:
+            raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    item = WhatnotInventory(**payload.model_dump())
+
+    # Calculate total cost if cost_per_unit is provided
+    if item.cost_per_unit and item.quantity:
+        item.total_cost = item.cost_per_unit * item.quantity
+
+    # Set initial status based on quantity
+    _update_inventory_status(item)
+
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    return _to_inventory_read(item, catalog)
+
+
+@router.put("/inventory/{item_id}", response_model=InventoryRead)
+async def update_inventory_item(
+    item_id: int,
+    payload: InventoryUpdate,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> InventoryRead:
+    """Update an inventory item."""
+    item = db.get(WhatnotInventory, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    # Verify catalog item if changing
+    catalog = None
+    if payload.catalog_item_id is not None:
+        if payload.catalog_item_id:
+            catalog = db.get(ProductCatalog, payload.catalog_item_id)
+            if not catalog:
+                raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    # Update fields
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(item, key, value)
+
+    # Recalculate total cost if quantity or cost_per_unit changed
+    if item.cost_per_unit and item.quantity:
+        item.total_cost = item.cost_per_unit * item.quantity
+
+    # Update status based on new quantity
+    _update_inventory_status(item)
+
+    from datetime import datetime
+    item.updated_at = datetime.utcnow()
+
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    if not catalog and item.catalog_item_id:
+        catalog = db.get(ProductCatalog, item.catalog_item_id)
+
+    return _to_inventory_read(item, catalog)
+
+
+@router.post("/inventory/{item_id}/adjust", response_model=InventoryRead)
+async def adjust_inventory_quantity(
+    item_id: int,
+    adjustment: InventoryAdjustment,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> InventoryRead:
+    """Adjust inventory quantity (add or remove)."""
+    item = db.get(WhatnotInventory, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    new_quantity = item.quantity + adjustment.adjustment
+    if new_quantity < 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reduce quantity below 0. Current: {item.quantity}, Adjustment: {adjustment.adjustment}"
+        )
+
+    item.quantity = new_quantity
+
+    # Recalculate total cost
+    if item.cost_per_unit:
+        item.total_cost = item.cost_per_unit * item.quantity
+
+    # Update status
+    _update_inventory_status(item)
+
+    # Track restock
+    if adjustment.adjustment > 0:
+        from datetime import date as date_type
+        item.last_restock_date = date_type.today()
+
+    from datetime import datetime
+    item.updated_at = datetime.utcnow()
+
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    catalog = None
+    if item.catalog_item_id:
+        catalog = db.get(ProductCatalog, item.catalog_item_id)
+
+    return _to_inventory_read(item, catalog)
+
+
+@router.delete("/inventory/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_inventory_item(
+    item_id: int,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> None:
+    """Delete an inventory item."""
+    item = db.get(WhatnotInventory, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+
+    db.delete(item)
+    db.commit()
+
+
+@router.post("/inventory/from-catalog/{catalog_id}", response_model=InventoryRead, status_code=status.HTTP_201_CREATED)
+async def create_inventory_from_catalog(
+    catalog_id: int,
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+    quantity: int = Body(..., embed=True),
+    cost_per_unit: Optional[Decimal] = Body(None, embed=True),
+    location: Optional[str] = Body(None, embed=True),
+    owner: Optional[str] = Body(None, embed=True),
+) -> InventoryRead:
+    """Create inventory item directly from a catalog item.
+
+    Automatically:
+    - Sets owner to 'Kanto' (business inventory) if not specified
+    - Applies COGS price from matching rule if cost_per_unit not specified
+    """
+    from app.services.whatnot.cogs_service import normalize_product_name, match_cogs_rule
+
+    catalog = db.get(ProductCatalog, catalog_id)
+    if not catalog:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    # Check if inventory already exists for this catalog item
+    existing = db.exec(
+        select(WhatnotInventory).where(WhatnotInventory.catalog_item_id == catalog_id)
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="Inventory item already exists for this catalog item. Use update instead."
+        )
+
+    # Auto-assign owner to "Kanto" if not specified (business inventory)
+    effective_owner = owner if owner else "Kanto"
+
+    # Auto-apply COGS price if not specified
+    effective_cost = cost_per_unit
+    if effective_cost is None:
+        # Try to match COGS rule based on catalog item name
+        normalized_name = normalize_product_name(catalog.name)
+        rule_id, cogs_amount = match_cogs_rule(db, normalized_name)
+        if cogs_amount is not None:
+            effective_cost = cogs_amount
+
+    item = WhatnotInventory(
+        catalog_item_id=catalog_id,
+        item_name=catalog.name,
+        category=catalog.category,
+        image_url=catalog.image_url,
+        quantity=quantity,
+        cost_per_unit=effective_cost,
+        location=location,
+        owner=effective_owner,
+    )
+
+    if effective_cost and quantity:
+        item.total_cost = effective_cost * quantity
+
+    _update_inventory_status(item)
+
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    return _to_inventory_read(item, catalog)
+
+
+@router.post("/inventory/sync-from-catalog")
+async def sync_inventory_from_catalog(
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """
+    Sync all catalog items to inventory.
+    Creates inventory entries for catalog items that don't already exist.
+    All new items start with quantity 0, owner 'Kanto', and COGS price from rules.
+    """
+    from app.services.whatnot.cogs_service import normalize_product_name, match_cogs_rule
+
+    # Get all catalog items
+    catalog_items = db.exec(select(ProductCatalog)).all()
+
+    # Get existing inventory catalog_item_ids
+    existing = db.exec(
+        select(WhatnotInventory.catalog_item_id).where(
+            WhatnotInventory.catalog_item_id != None
+        )
+    ).all()
+    existing_ids = set(existing)
+
+    created = 0
+    skipped = 0
+
+    for catalog in catalog_items:
+        if catalog.id in existing_ids:
+            skipped += 1
+            continue
+
+        # Try to get COGS price from matching rule
+        normalized_name = normalize_product_name(catalog.name)
+        rule_id, cogs_amount = match_cogs_rule(db, normalized_name)
+
+        # Create inventory item with quantity 0, owner Kanto, and COGS price
+        item = WhatnotInventory(
+            catalog_item_id=catalog.id,
+            item_name=catalog.name,
+            category=catalog.category,
+            image_url=catalog.image_url,
+            quantity=0,
+            low_stock_threshold=5,
+            status=InventoryItemStatus.OUT_OF_STOCK,
+            owner="Kanto",  # Business inventory
+            cost_per_unit=cogs_amount,  # From COGS rule if matched
+        )
+        db.add(item)
+        created += 1
+
+    db.commit()
+
+    return {
+        "created": created,
+        "skipped": skipped,
+        "total_catalog_items": len(catalog_items),
+        "message": f"Synced {created} new items to inventory ({skipped} already existed)"
+    }
+
+
+@router.post("/inventory/migrate-to-kanto")
+async def migrate_inventory_to_kanto(
+    current_user: AdminUser,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """
+    One-time migration: Set owner='Kanto' and apply COGS prices to existing inventory items.
+    Only updates items that don't have an owner or cost_per_unit set.
+    """
+    from app.services.whatnot.cogs_service import normalize_product_name, match_cogs_rule
+
+    items = db.exec(select(WhatnotInventory)).all()
+    updated_owner = 0
+    updated_cost = 0
+
+    for item in items:
+        changed = False
+
+        # Set owner to Kanto if not set
+        if not item.owner:
+            item.owner = "Kanto"
+            updated_owner += 1
+            changed = True
+
+        # Apply COGS price if not set
+        if item.cost_per_unit is None:
+            normalized_name = normalize_product_name(item.item_name)
+            rule_id, cogs_amount = match_cogs_rule(db, normalized_name)
+            if cogs_amount is not None:
+                item.cost_per_unit = cogs_amount
+                if item.quantity:
+                    item.total_cost = cogs_amount * item.quantity
+                updated_cost += 1
+                changed = True
+
+        if changed:
+            from datetime import datetime
+            item.updated_at = datetime.utcnow()
+
+    db.commit()
+
+    return {
+        "total_items": len(items),
+        "updated_owner": updated_owner,
+        "updated_cost": updated_cost,
+        "message": f"Migration complete: {updated_owner} items assigned to Kanto, {updated_cost} items got COGS prices"
     }
