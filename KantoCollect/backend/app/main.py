@@ -16,7 +16,6 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.core.inventory_database import init_inventory_db
 from app.core.whatnot_database import init_whatnot_db
-from app.core.whatnot_test_database import init_whatnot_test_db
 from app.api.v1.router import api_router
 
 # Static files directory (backend/app/main.py -> KantoCollect/apps/admin-dashboard)
@@ -38,8 +37,6 @@ async def lifespan(app: FastAPI):
     print("✅ Inventory database initialized")
     init_whatnot_db()
     print("✅ WhatNot sales database initialized")
-    init_whatnot_test_db()
-    print("✅ WhatNot sales TEST database initialized")
 
     yield
     
