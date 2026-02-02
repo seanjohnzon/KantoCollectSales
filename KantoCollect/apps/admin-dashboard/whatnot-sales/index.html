@@ -1927,28 +1927,52 @@
         }
 
         // Render grid
-        grid.innerHTML = singlesData.map(s => `
+        grid.innerHTML = singlesData.map(s => {
+          const isCatchAll = s.name === "Single Cards";
+          return `
           <div class="card" style="padding:16px;">
             <div style="display:flex; gap:12px;">
               <img src="${s.imageUrl || ''}"
                    style="width:80px; height:80px; border-radius:8px; object-fit:cover;"
                    onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22%3E%3Crect fill=%22%23333%22 width=%2280%22 height=%2280%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2212%22%3E🃏%3C/text%3E%3C/svg%3E';" />
               <div style="flex:1; min-width:0;">
-                <div style="font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</div>
+                <div id="single-name-display-${s.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                  <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</span>
+                  ${adminEnabled && !isCatchAll ? `
+                    <button onclick="editSingleName(${s.id})"
+                            style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; flex-shrink:0;"
+                            title="Rename card">✏️</button>
+                  ` : ''}
+                </div>
+                <div id="single-name-edit-${s.id}" style="display:none; margin-bottom:4px;">
+                  <input type="text" id="single-name-input-${s.id}" value="${s.name.replace(/"/g, '&quot;')}"
+                         style="width:100%; padding:4px 6px; background:#0f172a; border:1px solid #3b82f6; color:#e2e8f0; border-radius:4px; font-size:12px; margin-bottom:4px;" />
+                  <div style="display:flex; gap:4px;">
+                    <button onclick="applySingleName(${s.id})" style="padding:3px 8px; background:#22c55e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px;">✓</button>
+                    <button onclick="cancelSingleName(${s.id})" style="padding:3px 8px; background:#334155; color:#e2e8f0; border:none; border-radius:3px; cursor:pointer; font-size:10px;">✕</button>
+                  </div>
+                </div>
                 <div class="muted" style="font-size:12px;">
                   <div>📊 ${s.sales} sales</div>
                   <div>💰 $${s.revenue.toFixed(2)} revenue</div>
                 </div>
               </div>
             </div>
-            ${s.sales > 0 ? `
-              <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
-                      style="margin-top:12px; width:100%; padding:8px; background:#3b82f6; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;">
-                View ${s.sales} Transaction${s.sales > 1 ? 's' : ''}
-              </button>
-            ` : ''}
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              ${s.sales > 0 ? `
+                <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                        style="flex:1; padding:8px; background:#3b82f6; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;">
+                  View ${s.sales} Transaction${s.sales > 1 ? 's' : ''}
+                </button>
+              ` : ''}
+              ${adminEnabled && !isCatchAll ? `
+                <button onclick="deleteSingleCard(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                        style="padding:8px 12px; background:#ef4444; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;"
+                        title="Delete card">🗑️</button>
+              ` : ''}
+            </div>
           </div>
-        `).join('');
+        `}).join('');
 
       } catch (error) {
         console.error('Error loading singles:', error);
@@ -2075,20 +2099,35 @@
             <thead>
               <tr style="background:#1f2937; text-align:left;">
                 <th style="padding:10px 8px;">Date</th>
+                <th style="padding:10px 8px;">Item Name</th>
                 <th style="padding:10px 8px;">Buyer</th>
                 <th style="padding:10px 8px; text-align:right;">Price</th>
                 <th style="padding:10px 8px; text-align:right;">Earnings</th>
                 <th style="padding:10px 8px;">Show</th>
+                <th style="padding:10px 8px; text-align:center;">Actions</th>
               </tr>
             </thead>
             <tbody>
               ${transactions.map(t => `
                 <tr style="border-bottom:1px solid #1f2937;">
                   <td style="padding:10px 8px;">${t.date ? new Date(t.date).toLocaleDateString() : '-'}</td>
+                  <td style="padding:10px 8px; font-size:12px; color:#94a3b8;">${t.itemName || '-'}</td>
                   <td style="padding:10px 8px;">@${t.buyer}</td>
                   <td style="padding:10px 8px; text-align:right; font-weight:600; color:#22c55e;">$${parseFloat(t.price || 0).toFixed(2)}</td>
                   <td style="padding:10px 8px; text-align:right;">$${parseFloat(t.earnings || 0).toFixed(2)}</td>
                   <td style="padding:10px 8px; color:#94a3b8;">${t.showName || 'Marketplace'}</td>
+                  <td style="padding:10px 8px; text-align:center;">
+                    ${t.saleType === 'marketplace'
+                      ? `<button onclick="navigateToMarketplace(${t.id}); this.closest('[style*=fixed]').remove();"
+                                style="padding:4px 8px; background:#8b5cf6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">
+                           Go to Marketplace →
+                         </button>`
+                      : `<button onclick="navigateToShow(${t.showId || 'null'}, ${t.id}); this.closest('[style*=fixed]').remove();"
+                                style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">
+                           Go to Show →
+                         </button>`
+                    }
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -2096,6 +2135,78 @@
         `;
       } catch (error) {
         document.getElementById('single-transactions-content').innerHTML = `<div class="danger">Error: ${error.message}</div>`;
+      }
+    }
+
+    // Edit single card name
+    function editSingleName(singleId) {
+      document.getElementById(`single-name-display-${singleId}`).style.display = 'none';
+      document.getElementById(`single-name-edit-${singleId}`).style.display = 'block';
+      document.getElementById(`single-name-input-${singleId}`).focus();
+      document.getElementById(`single-name-input-${singleId}`).select();
+    }
+
+    function cancelSingleName(singleId) {
+      document.getElementById(`single-name-display-${singleId}`).style.display = 'flex';
+      document.getElementById(`single-name-edit-${singleId}`).style.display = 'none';
+      // Reset to original value
+      const single = singlesData.find(s => s.id === singleId);
+      if (single) {
+        document.getElementById(`single-name-input-${singleId}`).value = single.name;
+      }
+    }
+
+    async function applySingleName(singleId) {
+      const newName = document.getElementById(`single-name-input-${singleId}`).value.trim();
+      if (!newName) {
+        alert('Card name cannot be empty');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${apiBase}/product-catalog/${singleId}`, {
+          method: 'PATCH',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name: newName })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to update name');
+        }
+
+        // Reload singles grid
+        await loadSinglesGrid();
+        await loadUnmappedSingles();
+      } catch (error) {
+        alert('Error updating name: ' + error.message);
+      }
+    }
+
+    async function deleteSingleCard(singleId, cardName) {
+      if (!confirm(`Are you sure you want to delete "${cardName}"?\n\nThis will only remove it from the Singles catalog. Transactions will become unmapped.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`${apiBase}/product-catalog/${singleId}`, {
+          method: 'DELETE',
+          headers: authHeaders()
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to delete card');
+        }
+
+        // Reload singles grid
+        await loadSinglesGrid();
+        await loadUnmappedSingles();
+      } catch (error) {
+        alert('Error deleting card: ' + error.message);
       }
     }
 
@@ -2110,28 +2221,52 @@
         return;
       }
 
-      grid.innerHTML = filtered.map(s => `
+      grid.innerHTML = filtered.map(s => {
+        const isCatchAll = s.name === "Single Cards";
+        return `
         <div class="card" style="padding:16px;">
           <div style="display:flex; gap:12px;">
             <img src="${s.imageUrl || ''}"
                  style="width:80px; height:80px; border-radius:8px; object-fit:cover;"
                  onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22%3E%3Crect fill=%22%23333%22 width=%2280%22 height=%2280%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2212%22%3E🃏%3C/text%3E%3C/svg%3E';" />
             <div style="flex:1; min-width:0;">
-              <div style="font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</div>
+              <div id="single-name-display-${s.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</span>
+                ${adminEnabled && !isCatchAll ? `
+                  <button onclick="editSingleName(${s.id})"
+                          style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; flex-shrink:0;"
+                          title="Rename card">✏️</button>
+                ` : ''}
+              </div>
+              <div id="single-name-edit-${s.id}" style="display:none; margin-bottom:4px;">
+                <input type="text" id="single-name-input-${s.id}" value="${s.name.replace(/"/g, '&quot;')}"
+                       style="width:100%; padding:4px 6px; background:#0f172a; border:1px solid #3b82f6; color:#e2e8f0; border-radius:4px; font-size:12px; margin-bottom:4px;" />
+                <div style="display:flex; gap:4px;">
+                  <button onclick="applySingleName(${s.id})" style="padding:3px 8px; background:#22c55e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px;">✓</button>
+                  <button onclick="cancelSingleName(${s.id})" style="padding:3px 8px; background:#334155; color:#e2e8f0; border:none; border-radius:3px; cursor:pointer; font-size:10px;">✕</button>
+                </div>
+              </div>
               <div class="muted" style="font-size:12px;">
                 <div>📊 ${s.sales} sales</div>
                 <div>💰 $${s.revenue.toFixed(2)} revenue</div>
               </div>
             </div>
           </div>
-          ${s.sales > 0 ? `
-            <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
-                    style="margin-top:12px; width:100%; padding:8px; background:#3b82f6; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;">
-              View ${s.sales} Transaction${s.sales > 1 ? 's' : ''}
-            </button>
-          ` : ''}
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            ${s.sales > 0 ? `
+              <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                      style="flex:1; padding:8px; background:#3b82f6; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;">
+                View ${s.sales} Transaction${s.sales > 1 ? 's' : ''}
+              </button>
+            ` : ''}
+            ${adminEnabled && !isCatchAll ? `
+              <button onclick="deleteSingleCard(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                      style="padding:8px 12px; background:#ef4444; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;"
+                      title="Delete card">🗑️</button>
+            ` : ''}
+          </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     async function addSingleCard() {

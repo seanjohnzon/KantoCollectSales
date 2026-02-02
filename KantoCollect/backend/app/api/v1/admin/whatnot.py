@@ -1764,6 +1764,7 @@ async def get_catalog_item_transactions(
             "price": float(t.gross_sale_price or 0),
             "earnings": float(t.net_earnings or 0),
             "showName": show_name,
+            "showId": t.show_id,
             "saleType": t.sale_type,
             "owner": t.owner,
         })
