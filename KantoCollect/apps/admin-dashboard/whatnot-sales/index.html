@@ -587,15 +587,28 @@
           </div>
         </div>
 
-        <!-- Singles Grid -->
+        <!-- Singles Table -->
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
           <h3 style="margin:0;">📋 Single Cards Catalog</h3>
           <div class="row">
             <input id="singlesSearch" placeholder="Search singles..." style="width:200px;" onkeyup="filterSingles()" />
           </div>
         </div>
-        <div id="singlesGrid" class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
-          <div class="muted" style="padding:20px; text-align:center;">Loading singles...</div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#1f2937; text-align:left; border-bottom:2px solid #22c55e;">
+                <th style="padding:12px 8px; font-weight:600;">Image</th>
+                <th style="padding:12px 8px; font-weight:600;">Card Name</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:center;">Sales</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:right;">Revenue</th>
+                <th style="padding:12px 8px; font-weight:600; text-align:center;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="singlesTableBody">
+              <tr><td colspan="5" style="padding:20px; text-align:center;" class="muted">Loading singles...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1893,8 +1906,8 @@
     }
 
     async function loadSinglesGrid() {
-      const grid = document.getElementById('singlesGrid');
-      grid.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">Loading singles...</div>';
+      const tbody = document.getElementById('singlesTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center;" class="muted">Loading singles...</td></tr>';
 
       try {
         const res = await fetch(`${apiBase}/singles`, { headers: authHeaders() });
@@ -1923,61 +1936,70 @@
         `;
 
         if (singlesData.length === 0) {
-          grid.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">No single cards in catalog yet. Add cards from Master Catalog with category "Singles".</div>';
+          tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center;" class="muted">No single cards in catalog yet. Add cards from Master Catalog with category "Singles".</td></tr>';
           return;
         }
 
-        // Render grid
-        grid.innerHTML = singlesData.map(s => {
+        // Render table rows
+        tbody.innerHTML = singlesData.map(s => {
           const isCatchAll = s.name === "Single Cards";
           return `
-          <div class="card" style="padding:16px;">
-            <div style="display:flex; gap:12px;">
+          <tr style="border-bottom:1px solid #1f2937;" id="single-row-${s.id}">
+            <td style="padding:12px 8px;">
               <img src="${s.imageUrl || ''}"
-                   style="width:80px; height:80px; border-radius:8px; object-fit:cover;"
-                   onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22%3E%3Crect fill=%22%23333%22 width=%2280%22 height=%2280%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2212%22%3E🃏%3C/text%3E%3C/svg%3E';" />
-              <div style="flex:1; min-width:0;">
-                <div id="single-name-display-${s.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-                  <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</span>
-                  ${adminEnabled && !isCatchAll ? `
-                    <button onclick="editSingleName(${s.id})"
-                            style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; flex-shrink:0;"
-                            title="Rename card">✏️</button>
-                  ` : ''}
-                </div>
-                <div id="single-name-edit-${s.id}" style="display:none; margin-bottom:4px;">
-                  <input type="text" id="single-name-input-${s.id}" value="${s.name.replace(/"/g, '&quot;')}"
-                         style="width:100%; padding:4px 6px; background:#0f172a; border:1px solid #3b82f6; color:#e2e8f0; border-radius:4px; font-size:12px; margin-bottom:4px;" />
-                  <div style="display:flex; gap:4px;">
-                    <button onclick="applySingleName(${s.id})" style="padding:3px 8px; background:#22c55e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px;">✓</button>
-                    <button onclick="cancelSingleName(${s.id})" style="padding:3px 8px; background:#334155; color:#e2e8f0; border:none; border-radius:3px; cursor:pointer; font-size:10px;">✕</button>
-                  </div>
-                </div>
-                <div class="muted" style="font-size:12px;">
-                  <div>📊 ${s.sales} sales</div>
-                  <div>💰 $${s.revenue.toFixed(2)} revenue</div>
+                   style="width:60px; height:60px; border-radius:6px; object-fit:cover;"
+                   onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22%3E%3Crect fill=%22%23333%22 width=%2260%22 height=%2260%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2210%22%3E🃏%3C/text%3E%3C/svg%3E';"
+                   loading="lazy" />
+            </td>
+            <td style="padding:12px 8px;">
+              <div id="single-name-display-${s.id}" style="display:flex; align-items:center; gap:8px;">
+                <div style="font-weight:500;">${s.name}</div>
+                ${adminEnabled && !isCatchAll ? `
+                  <button onclick="editSingleName(${s.id})"
+                          style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; white-space:nowrap;"
+                          title="Rename card">✏️</button>
+                ` : ''}
+              </div>
+              <div id="single-name-edit-${s.id}" style="display:none;">
+                <input type="text" id="single-name-input-${s.id}" value="${s.name.replace(/"/g, '&quot;')}"
+                       style="width:100%; padding:6px 8px; background:#0f172a; border:1px solid #3b82f6; color:#e2e8f0; border-radius:4px; font-size:13px; margin-bottom:6px;" />
+                <div style="display:flex; gap:4px;">
+                  <button onclick="applySingleName(${s.id})" style="padding:4px 8px; background:#22c55e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:11px;">✓</button>
+                  <button onclick="cancelSingleName(${s.id})" style="padding:4px 8px; background:#334155; color:#e2e8f0; border:none; border-radius:3px; cursor:pointer; font-size:11px;">✕</button>
                 </div>
               </div>
-            </div>
-            <div style="display:flex; gap:8px; margin-top:12px;">
+            </td>
+            <td style="padding:12px 8px; text-align:center;">
               ${s.sales > 0 ? `
-                <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
-                        style="flex:1; padding:8px; background:#3b82f6; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;">
-                  View ${s.sales} Transaction${s.sales > 1 ? 's' : ''}
-                </button>
-              ` : ''}
-              ${adminEnabled && !isCatchAll ? `
-                <button onclick="deleteSingleCard(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
-                        style="padding:8px 12px; background:#ef4444; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;"
-                        title="Delete card">🗑️</button>
-              ` : ''}
-            </div>
-          </div>
+                <div onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="cursor:pointer; color:#3b82f6; font-weight:600;">
+                  ${s.sales}
+                </div>
+              ` : `<div class="muted">0</div>`}
+            </td>
+            <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">
+              $${parseFloat(s.revenue || 0).toFixed(2)}
+            </td>
+            <td style="padding:12px 8px; text-align:center;">
+              <div style="display:flex; gap:8px; justify-content:center;">
+                ${s.sales > 0 ? `
+                  <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                          style="padding:6px 12px; background:#3b82f6; border:none; color:white; border-radius:4px; cursor:pointer; font-size:12px; white-space:nowrap;">
+                    View Transactions
+                  </button>
+                ` : ''}
+                ${adminEnabled && !isCatchAll ? `
+                  <button onclick="deleteSingleCard(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                          style="padding:6px 12px; background:#ef4444; border:none; color:white; border-radius:4px; cursor:pointer; font-size:12px;"
+                          title="Delete card">🗑️</button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
         `}).join('');
 
       } catch (error) {
         console.error('Error loading singles:', error);
-        grid.innerHTML = `<div class="danger" style="padding:20px; text-align:center;">Error loading singles: ${error.message}</div>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:20px; text-align:center;" class="danger">Error loading singles: ${error.message}</td></tr>`;
       }
     }
 
@@ -2307,60 +2329,69 @@
 
     function filterSingles() {
       const search = document.getElementById('singlesSearch').value.toLowerCase();
-      const grid = document.getElementById('singlesGrid');
+      const tbody = document.getElementById('singlesTableBody');
 
       const filtered = singlesData.filter(s => s.name.toLowerCase().includes(search));
 
       if (filtered.length === 0) {
-        grid.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">No matching cards found</div>';
+        tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center;" class="muted">No matching cards found</td></tr>';
         return;
       }
 
-      grid.innerHTML = filtered.map(s => {
+      tbody.innerHTML = filtered.map(s => {
         const isCatchAll = s.name === "Single Cards";
         return `
-        <div class="card" style="padding:16px;">
-          <div style="display:flex; gap:12px;">
+        <tr style="border-bottom:1px solid #1f2937;" id="single-row-${s.id}">
+          <td style="padding:12px 8px;">
             <img src="${s.imageUrl || ''}"
-                 style="width:80px; height:80px; border-radius:8px; object-fit:cover;"
-                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22%3E%3Crect fill=%22%23333%22 width=%2280%22 height=%2280%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2212%22%3E🃏%3C/text%3E%3C/svg%3E';" />
-            <div style="flex:1; min-width:0;">
-              <div id="single-name-display-${s.id}" style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-                <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</span>
-                ${adminEnabled && !isCatchAll ? `
-                  <button onclick="editSingleName(${s.id})"
-                          style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; flex-shrink:0;"
-                          title="Rename card">✏️</button>
-                ` : ''}
-              </div>
-              <div id="single-name-edit-${s.id}" style="display:none; margin-bottom:4px;">
-                <input type="text" id="single-name-input-${s.id}" value="${s.name.replace(/"/g, '&quot;')}"
-                       style="width:100%; padding:4px 6px; background:#0f172a; border:1px solid #3b82f6; color:#e2e8f0; border-radius:4px; font-size:12px; margin-bottom:4px;" />
-                <div style="display:flex; gap:4px;">
-                  <button onclick="applySingleName(${s.id})" style="padding:3px 8px; background:#22c55e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px;">✓</button>
-                  <button onclick="cancelSingleName(${s.id})" style="padding:3px 8px; background:#334155; color:#e2e8f0; border:none; border-radius:3px; cursor:pointer; font-size:10px;">✕</button>
-                </div>
-              </div>
-              <div class="muted" style="font-size:12px;">
-                <div>📊 ${s.sales} sales</div>
-                <div>💰 $${s.revenue.toFixed(2)} revenue</div>
+                 style="width:60px; height:60px; border-radius:6px; object-fit:cover;"
+                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2260%22 height=%2260%22%3E%3Crect fill=%22%23333%22 width=%2260%22 height=%2260%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2210%22%3E🃏%3C/text%3E%3C/svg%3E';"
+                 loading="lazy" />
+          </td>
+          <td style="padding:12px 8px;">
+            <div id="single-name-display-${s.id}" style="display:flex; align-items:center; gap:8px;">
+              <div style="font-weight:500;">${s.name}</div>
+              ${adminEnabled && !isCatchAll ? `
+                <button onclick="editSingleName(${s.id})"
+                        style="padding:2px 6px; background:#3b82f6; color:white; border:none; border-radius:3px; cursor:pointer; font-size:10px; white-space:nowrap;"
+                        title="Rename card">✏️</button>
+              ` : ''}
+            </div>
+            <div id="single-name-edit-${s.id}" style="display:none;">
+              <input type="text" id="single-name-input-${s.id}" value="${s.name.replace(/"/g, '&quot;')}"
+                     style="width:100%; padding:6px 8px; background:#0f172a; border:1px solid #3b82f6; color:#e2e8f0; border-radius:4px; font-size:13px; margin-bottom:6px;" />
+              <div style="display:flex; gap:4px;">
+                <button onclick="applySingleName(${s.id})" style="padding:4px 8px; background:#22c55e; color:white; border:none; border-radius:3px; cursor:pointer; font-size:11px;">✓</button>
+                <button onclick="cancelSingleName(${s.id})" style="padding:4px 8px; background:#334155; color:#e2e8f0; border:none; border-radius:3px; cursor:pointer; font-size:11px;">✕</button>
               </div>
             </div>
-          </div>
-          <div style="display:flex; gap:8px; margin-top:12px;">
+          </td>
+          <td style="padding:12px 8px; text-align:center;">
             ${s.sales > 0 ? `
-              <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
-                      style="flex:1; padding:8px; background:#3b82f6; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;">
-                View ${s.sales} Transaction${s.sales > 1 ? 's' : ''}
-              </button>
-            ` : ''}
-            ${adminEnabled && !isCatchAll ? `
-              <button onclick="deleteSingleCard(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
-                      style="padding:8px 12px; background:#ef4444; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;"
-                      title="Delete card">🗑️</button>
-            ` : ''}
-          </div>
-        </div>
+              <div onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')" style="cursor:pointer; color:#3b82f6; font-weight:600;">
+                ${s.sales}
+              </div>
+            ` : `<div class="muted">0</div>`}
+          </td>
+          <td style="padding:12px 8px; text-align:right; font-weight:600; color:#22c55e;">
+            $${parseFloat(s.revenue || 0).toFixed(2)}
+          </td>
+          <td style="padding:12px 8px; text-align:center;">
+            <div style="display:flex; gap:8px; justify-content:center;">
+              ${s.sales > 0 ? `
+                <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                        style="padding:6px 12px; background:#3b82f6; border:none; color:white; border-radius:4px; cursor:pointer; font-size:12px; white-space:nowrap;">
+                  View Transactions
+                </button>
+              ` : ''}
+              ${adminEnabled && !isCatchAll ? `
+                <button onclick="deleteSingleCard(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                        style="padding:6px 12px; background:#ef4444; border:none; color:white; border-radius:4px; cursor:pointer; font-size:12px;"
+                        title="Delete card">🗑️</button>
+              ` : ''}
+            </div>
+          </td>
+        </tr>
       `}).join('');
     }
 
