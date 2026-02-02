@@ -948,8 +948,10 @@ async def get_product_catalog(
         )
     ).all()
 
-    # NEW RULE-BASED MATCHING LOGIC
-    # Simple, universal matching that doesn't require constant patching
+    # MATCHING LOGIC: Priority order:
+    # 1. Direct catalog_item_id mapping (from dropdown remapping)
+    # 2. Keyword-based matching (existing system)
+    # 3. CATCH_ALL fallback (unmapped items)
     transaction_matches = {}  # transaction_id -> catalog_item_id
     catch_all_item = None
 
@@ -961,10 +963,18 @@ async def get_product_catalog(
 
     # Match each transaction
     for t in transactions:
+        # PRIORITY 1: Check for direct catalog_item_id mapping (from dropdown remapping)
+        if t.catalog_item_id and t.is_mapped:
+            # Verify the catalog item still exists
+            catalog_exists = any(c.id == t.catalog_item_id for c in catalog_items)
+            if catalog_exists:
+                transaction_matches[t.id] = t.catalog_item_id
+                continue  # Skip keyword matching for directly mapped transactions
+
         item_name_lower = t.item_name.lower()
         matched = False
 
-        # Try to match against catalog items (ordered by priority)
+        # PRIORITY 2: Try to match against catalog items (ordered by priority)
         for catalog_item in catalog_items:
             # Skip CATCH_ALL items in this pass
             if catalog_item.rule_type == CatalogRuleType.CATCH_ALL:
@@ -1004,7 +1014,7 @@ async def get_product_catalog(
                 matched = True
                 break
 
-        # If no match found and we have a CATCH_ALL item, assign to it
+        # PRIORITY 3: If no match found and we have a CATCH_ALL item, assign to it
         if not matched and catch_all_item:
             transaction_matches[t.id] = catch_all_item.id
 

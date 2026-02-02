@@ -2492,12 +2492,22 @@
           // Expanded matched transactions
           if (isExpanded && catalogTransactions[p.id]) {
             const matches = catalogTransactions[p.id];
+            const isCatchAll = p.ruleType === 'catch_all';
+
+            // Build dropdown options for CATCH_ALL items (exclude catch_all items from options)
+            const catalogOptions = isCatchAll ? catalogProducts
+              .filter(c => c.ruleType !== 'catch_all')
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(c => `<option value="${c.id}">${c.name}</option>`)
+              .join('') : '';
+
             rows.push(`
               <tr style="background:#0f172a;">
                 <td colspan="9" style="padding:16px 24px;">
                   <div style="font-size:13px; font-weight:600; margin-bottom:12px; color:#94a3b8;">
-                    📋 ${matches.length} Matched Transactions
+                    ${isCatchAll ? '⚠️' : '📋'} ${matches.length} ${isCatchAll ? 'Unmapped' : 'Matched'} Transactions
                   </div>
+                  ${isCatchAll ? '<div style="font-size:12px; color:#f59e0b; margin-bottom:12px;">These transactions need to be mapped to specific catalog items</div>' : ''}
                   <div style="max-height:400px; overflow-y:auto;">
                     <table style="width:100%; font-size:12px; border-collapse:collapse;">
                       <thead>
@@ -2506,7 +2516,7 @@
                           <th style="padding:8px; text-align:left; color:#94a3b8;">Item Name</th>
                           <th style="padding:8px; text-align:left; color:#94a3b8;">Show</th>
                           <th style="padding:8px; text-align:right; color:#94a3b8;">Price</th>
-                          ${adminEnabled ? '<th style="padding:8px; text-align:left; color:#94a3b8;">Matched Keyword</th>' : ''}
+                          ${adminEnabled ? (isCatchAll ? '<th style="padding:8px; text-align:left; color:#94a3b8;">Map To</th>' : '<th style="padding:8px; text-align:left; color:#94a3b8;">Matched Keyword</th>') : ''}
                           ${adminEnabled ? '<th style="padding:8px; text-align:left; color:#94a3b8;">Owner</th>' : ''}
                           <th style="padding:8px; text-align:center; color:#94a3b8;">Actions</th>
                         </tr>
@@ -2521,7 +2531,21 @@
                               <td style="padding:8px;">${m.item_name}</td>
                               <td style="padding:8px; color:#64748b;">${m.sale_type === 'marketplace' ? 'Marketplace' : (m.show_name || 'Show #' + m.show_id)}</td>
                               <td style="padding:8px; text-align:right; color:#22c55e;">$${parseFloat(m.gross_sale_price || 0).toFixed(2)}</td>
-                              ${adminEnabled ? `<td style="padding:8px; font-size:11px; color:#f59e0b;">"${matchedKeyword}"</td>` : ''}
+                              ${adminEnabled ? (isCatchAll ? `
+                              <td style="padding:8px;">
+                                <div style="display:flex; align-items:center; gap:4px;">
+                                  <select id="catalog-remap-${m.id}"
+                                          style="flex:1; min-width:150px; padding:4px 6px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:11px;">
+                                    <option value="">Select item...</option>
+                                    ${catalogOptions}
+                                  </select>
+                                  <button onclick="remapFromCatalog(${m.id}, ${p.id})"
+                                          style="padding:4px 8px; background:#22c55e; color:white; border:none; border-radius:4px; cursor:pointer; font-size:10px; white-space:nowrap;">
+                                    Map
+                                  </button>
+                                </div>
+                              </td>
+                              ` : `<td style="padding:8px; font-size:11px; color:#f59e0b;">"${matchedKeyword}"</td>`) : ''}
                               ${adminEnabled ? `
                               <td style="padding:8px;">
                                 <div style="display:flex; align-items:center; gap:4px;">
@@ -2815,6 +2839,44 @@
       } catch (error) {
         console.error('Failed to assign owner:', error);
         alert('Failed to assign owner: ' + error.message);
+      }
+    }
+
+    // Remap a transaction from CATCH_ALL to a specific catalog item
+    async function remapFromCatalog(transactionId, currentCatalogId) {
+      const selectEl = document.getElementById(`catalog-remap-${transactionId}`);
+      const newCatalogId = selectEl ? selectEl.value : '';
+
+      if (!newCatalogId) {
+        alert('Please select a catalog item to map to');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${apiBase}/transactions/${transactionId}/remap-catalog`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ catalog_id: parseInt(newCatalogId) }),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({ detail: res.statusText }));
+          throw new Error(errorData.detail || 'Failed to remap transaction');
+        }
+
+        // Clear the cache for both old and new catalog items
+        delete catalogTransactions[currentCatalogId];
+        delete catalogTransactions[newCatalogId];
+
+        // Reload Master Catalog to reflect changes
+        await loadMasterCatalog();
+
+      } catch (error) {
+        console.error('Failed to remap transaction:', error);
+        alert('Failed to remap: ' + error.message);
       }
     }
 
