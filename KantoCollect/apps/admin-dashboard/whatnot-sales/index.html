@@ -546,9 +546,9 @@
           <h3 style="margin:0 0 16px 0; font-size:16px;">➕ Add New Single Card</h3>
           <div style="display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end;">
             <div>
-              <label style="display:block; margin-bottom:6px; font-size:13px; color:#94a3b8;">Image URL from ImageKit</label>
+              <label style="display:block; margin-bottom:6px; font-size:13px; color:#94a3b8;">PriceCharting URL or Image URL</label>
               <input id="newSingleImageUrl" type="text"
-                     placeholder="Paste image URL here (e.g., https://ik.imagekit.io/homecraft/...)"
+                     placeholder="Paste PriceCharting URL (e.g., pricecharting.com/game/...) or ImageKit URL"
                      style="width:100%; padding:10px; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#e2e8f0; font-size:13px;" />
             </div>
             <button onclick="addSingleCard()" style="padding:10px 24px; white-space:nowrap;">
@@ -556,6 +556,7 @@
             </button>
           </div>
           <div id="addSingleMessage" style="margin-top:12px; font-size:13px;"></div>
+          <div class="muted" style="font-size:11px; margin-top:8px;">Tip: Paste a PriceCharting URL to auto-fetch the card name and image</div>
         </div>
 
         <!-- Stats -->
@@ -2103,6 +2104,8 @@
                 <th style="padding:10px 8px;">Buyer</th>
                 <th style="padding:10px 8px; text-align:right;">Price</th>
                 <th style="padding:10px 8px; text-align:right;">Earnings</th>
+                <th style="padding:10px 8px; text-align:right;">COGS</th>
+                <th style="padding:10px 8px;">Owner</th>
                 <th style="padding:10px 8px;">Show</th>
                 <th style="padding:10px 8px; text-align:center;">Actions</th>
               </tr>
@@ -2115,6 +2118,40 @@
                   <td style="padding:10px 8px;">@${t.buyer}</td>
                   <td style="padding:10px 8px; text-align:right; font-weight:600; color:#22c55e;">$${parseFloat(t.price || 0).toFixed(2)}</td>
                   <td style="padding:10px 8px; text-align:right;">$${parseFloat(t.earnings || 0).toFixed(2)}</td>
+                  <td style="padding:10px 8px; text-align:right;">
+                    ${adminEnabled
+                      ? `<div style="display:flex; align-items:center; justify-content:flex-end; gap:4px;">
+                           <input type="number" step="0.01" min="0" value="${t.cogs || ''}"
+                                  id="cogs-input-${t.id}"
+                                  style="width:70px; padding:4px 6px; background:#0f172a; border:1px solid #334155; border-radius:4px; color:#e2e8f0; font-size:12px; text-align:right;"
+                                  placeholder="0.00" />
+                           <button onclick="saveSingleCogs(${t.id})"
+                                   style="padding:4px 6px; background:#22c55e; color:#0f172a; border:none; border-radius:4px; cursor:pointer; font-size:10px; font-weight:600;">
+                             Save
+                           </button>
+                         </div>`
+                      : `<span style="color:${t.cogs ? '#22c55e' : '#94a3b8'};">$${t.cogs ? parseFloat(t.cogs).toFixed(2) : '-'}</span>`
+                    }
+                  </td>
+                  <td style="padding:10px 8px;">
+                    ${adminEnabled
+                      ? `<div style="display:flex; align-items:center; gap:4px;">
+                           <select id="owner-select-${t.id}"
+                                   style="padding:4px 6px; background:#0f172a; border:1px solid #334155; border-radius:4px; color:#e2e8f0; font-size:11px; cursor:pointer;">
+                             <option value="" ${!t.owner ? 'selected' : ''}>-</option>
+                             <option value="Cihan" ${t.owner === 'Cihan' ? 'selected' : ''}>Cihan</option>
+                             <option value="Nima" ${t.owner === 'Nima' ? 'selected' : ''}>Nima</option>
+                             <option value="Askar" ${t.owner === 'Askar' ? 'selected' : ''}>Askar</option>
+                             <option value="Kanto" ${t.owner === 'Kanto' ? 'selected' : ''}>Kanto</option>
+                           </select>
+                           <button onclick="saveSingleOwner(${t.id})"
+                                   style="padding:3px 5px; background:#22c55e; color:#0f172a; border:none; border-radius:4px; cursor:pointer; font-size:11px;">
+                             ✓
+                           </button>
+                         </div>`
+                      : `<span style="color:#94a3b8;">${t.owner || '-'}</span>`
+                    }
+                  </td>
                   <td style="padding:10px 8px; color:#94a3b8;">${t.showName || 'Marketplace'}</td>
                   <td style="padding:10px 8px; text-align:center;">
                     ${t.saleType === 'marketplace'
@@ -2183,6 +2220,64 @@
         await loadUnmappedSingles();
       } catch (error) {
         alert('Error updating name: ' + error.message);
+      }
+    }
+
+    // Save COGS for a single transaction from the Singles modal
+    async function saveSingleCogs(transactionId) {
+      const input = document.getElementById(`cogs-input-${transactionId}`);
+      const cogsValue = parseFloat(input.value) || 0;
+
+      try {
+        const res = await fetch(`${apiBase}/transactions/${transactionId}`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ cogs: cogsValue })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to save COGS');
+        }
+
+        // Visual feedback
+        input.style.borderColor = '#22c55e';
+        setTimeout(() => { input.style.borderColor = '#334155'; }, 1500);
+      } catch (error) {
+        alert('Error saving COGS: ' + error.message);
+        input.style.borderColor = '#ef4444';
+      }
+    }
+
+    // Save Owner for a single transaction from the Singles modal
+    async function saveSingleOwner(transactionId) {
+      const select = document.getElementById(`owner-select-${transactionId}`);
+      const ownerValue = select.value || null;
+
+      try {
+        const res = await fetch(`${apiBase}/transactions/${transactionId}/owner`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(ownerValue)
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to save owner');
+        }
+
+        // Visual feedback
+        select.style.borderColor = '#22c55e';
+        setTimeout(() => { select.style.borderColor = '#334155'; }, 1500);
+      } catch (error) {
+        alert('Error saving owner: ' + error.message);
+        select.style.borderColor = '#ef4444';
       }
     }
 
@@ -2270,29 +2365,58 @@
     }
 
     async function addSingleCard() {
-      const imageUrl = document.getElementById('newSingleImageUrl').value.trim();
+      const inputUrl = document.getElementById('newSingleImageUrl').value.trim();
       const msgDiv = document.getElementById('addSingleMessage');
 
-      if (!imageUrl) {
-        msgDiv.innerHTML = '<span class="warning">⚠️ Please enter an image URL</span>';
+      if (!inputUrl) {
+        msgDiv.innerHTML = '<span class="warning">⚠️ Please enter a URL</span>';
         return;
       }
 
-      // Extract name from URL (same logic as Master Catalog)
+      let imageUrl = inputUrl;
       let extractedName = '';
-      try {
-        const urlParts = imageUrl.split('/');
-        const fileName = urlParts[urlParts.length - 1];
-        extractedName = decodeURIComponent(fileName)
-          .replace(/\.(jpg|jpeg|png|gif|webp)$/i, '')
-          .replace(/_/g, ' ')
-          .replace(/-/g, ' ')
-          .trim();
-      } catch (e) {
-        extractedName = 'New Single Card';
-      }
 
-      msgDiv.innerHTML = '<span class="muted">Adding card...</span>';
+      // Check if it's a PriceCharting URL
+      const isPriceCharting = inputUrl.includes('pricecharting.com');
+
+      if (isPriceCharting) {
+        msgDiv.innerHTML = '<span class="muted">Fetching card data from PriceCharting...</span>';
+
+        try {
+          const fetchRes = await fetch(`${apiBase}/pricecharting/fetch`, {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ url: inputUrl })
+          });
+
+          if (!fetchRes.ok) {
+            const error = await fetchRes.json();
+            throw new Error(error.detail || 'Failed to fetch from PriceCharting');
+          }
+
+          const cardData = await fetchRes.json();
+          imageUrl = cardData.image_url;
+          extractedName = cardData.name;
+          msgDiv.innerHTML = `<span class="muted">Found: ${extractedName}. Adding card...</span>`;
+        } catch (error) {
+          msgDiv.innerHTML = `<span class="danger">❌ Error: ${error.message}</span>`;
+          return;
+        }
+      } else {
+        // Extract name from ImageKit URL (same logic as before)
+        try {
+          const urlParts = imageUrl.split('/');
+          const fileName = urlParts[urlParts.length - 1].split('?')[0];
+          extractedName = decodeURIComponent(fileName)
+            .replace(/\.(jpg|jpeg|png|gif|webp)$/i, '')
+            .replace(/_/g, ' ')
+            .replace(/-/g, ' ')
+            .trim();
+        } catch (e) {
+          extractedName = 'New Single Card';
+        }
+        msgDiv.innerHTML = '<span class="muted">Adding card...</span>';
+      }
 
       try {
         const res = await fetch(`${apiBase}/product-catalog/add`, {
@@ -2302,7 +2426,7 @@
             name: extractedName,
             category: 'Singles',
             image_url: imageUrl,
-            include_keywords: [extractedName],
+            include_keywords: [extractedName.toLowerCase()],
             rule_type: 'include_any'
           })
         });
@@ -2313,7 +2437,7 @@
         }
 
         document.getElementById('newSingleImageUrl').value = '';
-        msgDiv.innerHTML = '<span class="success">✅ Card added successfully!</span>';
+        msgDiv.innerHTML = `<span class="success">✅ Card "${extractedName}" added successfully!</span>`;
         await loadSinglesGrid();
         await loadUnmappedSingles();
       } catch (error) {

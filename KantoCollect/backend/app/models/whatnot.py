@@ -533,6 +533,8 @@ class ProductCatalogRead(SQLModel):
 class ProductCatalogCreate(SQLModel):
     """Create schema for adding product to catalog."""
     image_url: str  # User pastes full URL
+    name: Optional[str] = None  # Optional: override auto-extracted name
+    category: Optional[str] = None  # Optional: override auto-categorization (e.g., "Singles")
 
 
 class ProductCatalogUpdate(SQLModel):
