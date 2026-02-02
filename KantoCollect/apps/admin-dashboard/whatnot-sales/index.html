@@ -108,6 +108,7 @@
       <div class="tab" onclick="showTab('marketplace')">🛒 Marketplace</div>
       <div class="tab" onclick="showTab('inventory')" id="inventory-tab-btn">🏪 Inventory</div>
       <div class="tab" onclick="showTab('products')">🏷️ Products</div>
+      <div class="tab" onclick="showTab('singles')">🃏 Singles</div>
       <div class="tab" onclick="showTab('buyers')">👥 Buyers</div>
       <div class="tab" onclick="showTab('owners')">👤 Owners</div>
     </div>
@@ -535,6 +536,70 @@
       </div>
     </div>
 
+    <!-- SINGLES TAB -->
+    <div id="singles-tab" class="tab-content">
+      <div class="card">
+        <h2>🃏 Single Cards Management</h2>
+        <p class="muted" style="margin-bottom:16px;">Manage individual single card sales. Map generic "OP Single" transactions to specific cards.</p>
+
+        <!-- Add New Single Card Section -->
+        <div id="addSingleSection" style="background:#0f172a; padding:20px; border-radius:8px; border:1px solid #1f2937; margin-bottom:24px; display:none;">
+          <h3 style="margin:0 0 16px 0; font-size:16px;">➕ Add New Single Card</h3>
+          <div style="display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end;">
+            <div>
+              <label style="display:block; margin-bottom:6px; font-size:13px; color:#94a3b8;">Image URL from ImageKit</label>
+              <input id="newSingleImageUrl" type="text"
+                     placeholder="Paste image URL here (e.g., https://ik.imagekit.io/homecraft/...)"
+                     style="width:100%; padding:10px; background:#1e293b; border:1px solid #334155; border-radius:6px; color:#e2e8f0; font-size:13px;" />
+            </div>
+            <button onclick="addSingleCard()" style="padding:10px 24px; white-space:nowrap;">
+              ➕ Add Card
+            </button>
+          </div>
+          <div id="addSingleMessage" style="margin-top:12px; font-size:13px;"></div>
+        </div>
+
+        <!-- Stats -->
+        <div id="singlesStats" class="stat-grid" style="margin-bottom:24px;"></div>
+
+        <!-- Unmapped Singles Section -->
+        <div id="unmappedSinglesSection" style="margin-bottom:24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="margin:0; color:#f59e0b;">⚠️ Unmapped Singles (<span id="unmappedCount">0</span>)</h3>
+            <div class="muted" style="font-size:12px;">These need to be assigned to specific cards</div>
+          </div>
+          <div id="unmappedSinglesList" style="max-height:300px; overflow-y:auto; border:1px solid #1f2937; border-radius:8px;">
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+              <thead>
+                <tr style="background:#1f2937; text-align:left; position:sticky; top:0;">
+                  <th style="padding:10px 8px; font-weight:600;">Date</th>
+                  <th style="padding:10px 8px; font-weight:600;">Item Name</th>
+                  <th style="padding:10px 8px; font-weight:600;">Show</th>
+                  <th style="padding:10px 8px; font-weight:600; text-align:right;">Price</th>
+                  <th style="padding:10px 8px; font-weight:600;">Buyer</th>
+                  <th style="padding:10px 8px; font-weight:600; text-align:center;">Map To</th>
+                </tr>
+              </thead>
+              <tbody id="unmappedSinglesBody">
+                <tr><td colspan="6" style="padding:20px; text-align:center;" class="muted">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Singles Grid -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="margin:0;">📋 Single Cards Catalog</h3>
+          <div class="row">
+            <input id="singlesSearch" placeholder="Search singles..." style="width:200px;" onkeyup="filterSingles()" />
+          </div>
+        </div>
+        <div id="singlesGrid" class="grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:16px;">
+          <div class="muted" style="padding:20px; text-align:center;">Loading singles...</div>
+        </div>
+      </div>
+    </div>
+
     <!-- BUYERS TAB -->
     <div id="buyers-tab" class="tab-content">
       <div class="card">
@@ -827,6 +892,7 @@
           else if (tabName === 'marketplace') loadMarketplace();
           else if (tabName === 'inventory') loadInventory();
           else if (tabName === 'products') loadProducts();
+          else if (tabName === 'singles') loadSingles();
           else if (tabName === 'analytics') loadAnalytics();
         }
       } catch (error) {
@@ -853,6 +919,7 @@
       if (tabName === 'marketplace') loadMarketplace();
       if (tabName === 'inventory') loadInventory();
       if (tabName === 'products') loadProducts();
+      if (tabName === 'singles') loadSingles();
       if (tabName === 'buyers') loadBuyers();
       if (tabName === 'owners') loadOwners();
       if (tabName === 'analytics') loadAnalytics();
@@ -1812,6 +1879,315 @@
         content.innerHTML = html;
       } catch (error) {
         document.getElementById('product-transactions-content').innerHTML = `<div class="danger">Error loading transactions: ${error.message}</div>`;
+      }
+    }
+
+    // Singles
+    let singlesData = [];
+    let unmappedSinglesData = [];
+
+    async function loadSingles() {
+      // Show/hide add section based on admin status
+      document.getElementById('addSingleSection').style.display = adminEnabled ? 'block' : 'none';
+
+      // Load singles catalog items
+      await loadSinglesGrid();
+      // Load unmapped singles
+      await loadUnmappedSingles();
+    }
+
+    async function loadSinglesGrid() {
+      const grid = document.getElementById('singlesGrid');
+      grid.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">Loading singles...</div>';
+
+      try {
+        const res = await fetch(`${apiBase}/singles`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Failed to load singles');
+        const data = await res.json();
+        singlesData = data.singles;
+
+        // Update stats
+        const totalCards = singlesData.length;
+        const totalSales = singlesData.reduce((sum, s) => sum + s.sales, 0);
+        const totalRevenue = singlesData.reduce((sum, s) => sum + s.revenue, 0);
+
+        document.getElementById('singlesStats').innerHTML = `
+          <div class="stat-card">
+            <div class="stat-value">${totalCards}</div>
+            <div class="stat-label">Single Cards</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${totalSales}</div>
+            <div class="stat-label">Total Sales</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">$${totalRevenue.toFixed(2)}</div>
+            <div class="stat-label">Total Revenue</div>
+          </div>
+        `;
+
+        if (singlesData.length === 0) {
+          grid.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">No single cards in catalog yet. Add cards from Master Catalog with category "Singles".</div>';
+          return;
+        }
+
+        // Render grid
+        grid.innerHTML = singlesData.map(s => `
+          <div class="card" style="padding:16px;">
+            <div style="display:flex; gap:12px;">
+              <img src="${s.imageUrl || ''}"
+                   style="width:80px; height:80px; border-radius:8px; object-fit:cover;"
+                   onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22%3E%3Crect fill=%22%23333%22 width=%2280%22 height=%2280%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2212%22%3E🃏%3C/text%3E%3C/svg%3E';" />
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</div>
+                <div class="muted" style="font-size:12px;">
+                  <div>📊 ${s.sales} sales</div>
+                  <div>💰 $${s.revenue.toFixed(2)} revenue</div>
+                </div>
+              </div>
+            </div>
+            ${s.sales > 0 ? `
+              <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                      style="margin-top:12px; width:100%; padding:8px; background:#3b82f6; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;">
+                View ${s.sales} Transaction${s.sales > 1 ? 's' : ''}
+              </button>
+            ` : ''}
+          </div>
+        `).join('');
+
+      } catch (error) {
+        console.error('Error loading singles:', error);
+        grid.innerHTML = `<div class="danger" style="padding:20px; text-align:center;">Error loading singles: ${error.message}</div>`;
+      }
+    }
+
+    async function loadUnmappedSingles() {
+      const tbody = document.getElementById('unmappedSinglesBody');
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center;" class="muted">Loading...</td></tr>';
+
+      try {
+        const res = await fetch(`${apiBase}/singles/unmapped`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Failed to load unmapped singles');
+        const data = await res.json();
+        unmappedSinglesData = data.unmapped;
+
+        document.getElementById('unmappedCount').textContent = data.total;
+
+        if (data.unmapped.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center;" class="success">✅ All singles are mapped!</td></tr>';
+          document.getElementById('unmappedSinglesSection').style.display = 'none';
+          return;
+        }
+
+        document.getElementById('unmappedSinglesSection').style.display = 'block';
+
+        // Build dropdown options from singlesData
+        const cardOptions = singlesData.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+        tbody.innerHTML = data.unmapped.map(t => `
+          <tr style="border-bottom:1px solid #1f2937;">
+            <td style="padding:10px 8px; font-size:12px;">${t.date ? new Date(t.date).toLocaleDateString() : '-'}</td>
+            <td style="padding:10px 8px; font-weight:500;">${t.itemName}</td>
+            <td style="padding:10px 8px; font-size:12px; color:#94a3b8;">${t.showName || 'Marketplace'}</td>
+            <td style="padding:10px 8px; text-align:right; font-weight:600; color:#22c55e;">$${t.price.toFixed(2)}</td>
+            <td style="padding:10px 8px; font-size:12px;">@${t.buyer}</td>
+            <td style="padding:10px 8px; text-align:center;">
+              ${adminEnabled ? `
+                <div style="display:flex; gap:4px; justify-content:center;">
+                  <select id="remap-select-${t.id}" style="padding:4px 8px; background:#0f172a; border:1px solid #334155; color:#e2e8f0; border-radius:4px; font-size:11px; max-width:150px;">
+                    <option value="">Select card...</option>
+                    ${cardOptions}
+                  </select>
+                  <button onclick="remapTransaction(${t.id})"
+                          style="padding:4px 8px; background:#22c55e; border:none; color:#0f172a; border-radius:4px; cursor:pointer; font-size:11px; font-weight:600;">
+                    Map
+                  </button>
+                </div>
+              ` : '<span class="muted">Admin only</span>'}
+            </td>
+          </tr>
+        `).join('');
+
+      } catch (error) {
+        console.error('Error loading unmapped singles:', error);
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:20px; text-align:center;" class="danger">Error: ${error.message}</td></tr>`;
+      }
+    }
+
+    async function remapTransaction(transactionId) {
+      const select = document.getElementById(`remap-select-${transactionId}`);
+      const catalogId = select.value;
+
+      if (!catalogId) {
+        alert('Please select a card to map to');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${apiBase}/transactions/${transactionId}/remap-catalog`, {
+          method: 'PUT',
+          headers: authHeaders(),
+          body: JSON.stringify({ catalog_id: parseInt(catalogId) })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to remap transaction');
+        }
+
+        // Reload both sections
+        await loadSinglesGrid();
+        await loadUnmappedSingles();
+      } catch (error) {
+        console.error('Error remapping transaction:', error);
+        alert('Error: ' + error.message);
+      }
+    }
+
+    async function showSingleTransactions(catalogId, cardName) {
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
+
+      modal.innerHTML = `
+        <div style="background:#0f172a; border:1px solid #1f2937; border-radius:12px; max-width:900px; width:100%; max-height:90vh; overflow:auto; padding:24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h3 style="margin:0; color:#e2e8f0;">🃏 ${cardName}</h3>
+            <button onclick="this.closest('div').parentElement.parentElement.remove()"
+                    style="background:#334155; color:#e2e8f0; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:14px;">
+              ✕ Close
+            </button>
+          </div>
+          <div id="single-transactions-content">Loading...</div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      try {
+        const res = await fetch(`${apiBase}/product-catalog/${catalogId}/transactions`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Failed to load transactions');
+        const transactions = await res.json();
+
+        const content = document.getElementById('single-transactions-content');
+
+        if (transactions.length === 0) {
+          content.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">No transactions found</div>';
+          return;
+        }
+
+        content.innerHTML = `
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="background:#1f2937; text-align:left;">
+                <th style="padding:10px 8px;">Date</th>
+                <th style="padding:10px 8px;">Buyer</th>
+                <th style="padding:10px 8px; text-align:right;">Price</th>
+                <th style="padding:10px 8px; text-align:right;">Earnings</th>
+                <th style="padding:10px 8px;">Show</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${transactions.map(t => `
+                <tr style="border-bottom:1px solid #1f2937;">
+                  <td style="padding:10px 8px;">${t.date ? new Date(t.date).toLocaleDateString() : '-'}</td>
+                  <td style="padding:10px 8px;">@${t.buyer}</td>
+                  <td style="padding:10px 8px; text-align:right; font-weight:600; color:#22c55e;">$${parseFloat(t.price || 0).toFixed(2)}</td>
+                  <td style="padding:10px 8px; text-align:right;">$${parseFloat(t.earnings || 0).toFixed(2)}</td>
+                  <td style="padding:10px 8px; color:#94a3b8;">${t.showName || 'Marketplace'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (error) {
+        document.getElementById('single-transactions-content').innerHTML = `<div class="danger">Error: ${error.message}</div>`;
+      }
+    }
+
+    function filterSingles() {
+      const search = document.getElementById('singlesSearch').value.toLowerCase();
+      const grid = document.getElementById('singlesGrid');
+
+      const filtered = singlesData.filter(s => s.name.toLowerCase().includes(search));
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">No matching cards found</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(s => `
+        <div class="card" style="padding:16px;">
+          <div style="display:flex; gap:12px;">
+            <img src="${s.imageUrl || ''}"
+                 style="width:80px; height:80px; border-radius:8px; object-fit:cover;"
+                 onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2280%22 height=%2280%22%3E%3Crect fill=%22%23333%22 width=%2280%22 height=%2280%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 fill=%22%23666%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2212%22%3E🃏%3C/text%3E%3C/svg%3E';" />
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${s.name}">${s.name}</div>
+              <div class="muted" style="font-size:12px;">
+                <div>📊 ${s.sales} sales</div>
+                <div>💰 $${s.revenue.toFixed(2)} revenue</div>
+              </div>
+            </div>
+          </div>
+          ${s.sales > 0 ? `
+            <button onclick="showSingleTransactions(${s.id}, '${s.name.replace(/'/g, "\\'")}')"
+                    style="margin-top:12px; width:100%; padding:8px; background:#3b82f6; border:none; color:white; border-radius:6px; cursor:pointer; font-size:12px;">
+              View ${s.sales} Transaction${s.sales > 1 ? 's' : ''}
+            </button>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function addSingleCard() {
+      const imageUrl = document.getElementById('newSingleImageUrl').value.trim();
+      const msgDiv = document.getElementById('addSingleMessage');
+
+      if (!imageUrl) {
+        msgDiv.innerHTML = '<span class="warning">⚠️ Please enter an image URL</span>';
+        return;
+      }
+
+      // Extract name from URL (same logic as Master Catalog)
+      let extractedName = '';
+      try {
+        const urlParts = imageUrl.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        extractedName = decodeURIComponent(fileName)
+          .replace(/\.(jpg|jpeg|png|gif|webp)$/i, '')
+          .replace(/_/g, ' ')
+          .replace(/-/g, ' ')
+          .trim();
+      } catch (e) {
+        extractedName = 'New Single Card';
+      }
+
+      msgDiv.innerHTML = '<span class="muted">Adding card...</span>';
+
+      try {
+        const res = await fetch(`${apiBase}/product-catalog/add`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            name: extractedName,
+            category: 'Singles',
+            image_url: imageUrl,
+            include_keywords: [extractedName],
+            rule_type: 'include_any'
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.detail || 'Failed to add card');
+        }
+
+        document.getElementById('newSingleImageUrl').value = '';
+        msgDiv.innerHTML = '<span class="success">✅ Card added successfully!</span>';
+        await loadSinglesGrid();
+        await loadUnmappedSingles();
+      } catch (error) {
+        msgDiv.innerHTML = `<span class="danger">❌ Error: ${error.message}</span>`;
       }
     }
 

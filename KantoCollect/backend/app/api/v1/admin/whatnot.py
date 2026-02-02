@@ -1375,6 +1375,392 @@ async def mark_catalog_item_mapped(
     }
 
 
+@router.put("/transactions/{transaction_id}/remap-catalog")
+async def remap_transaction_catalog(
+    transaction_id: int,
+    catalog_id: int = Body(..., embed=True),
+    current_user: AdminUser = None,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """
+    Remap a transaction to a different catalog item.
+    Used for Singles tab to assign generic 'OP Single' transactions to specific cards.
+    """
+    from datetime import datetime
+
+    transaction = db.get(SalesTransaction, transaction_id)
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    catalog_item = db.get(ProductCatalog, catalog_id)
+    if not catalog_item:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    # Update the transaction's catalog mapping
+    transaction.catalog_item_id = catalog_id
+    transaction.is_mapped = True
+    transaction.matched_keyword = f"Manual: {catalog_item.name}"
+    transaction.mapped_at = datetime.utcnow()
+    db.add(transaction)
+    db.commit()
+
+    return {
+        "success": True,
+        "transaction_id": transaction_id,
+        "catalog_item_id": catalog_id,
+        "catalog_item_name": catalog_item.name
+    }
+
+
+@router.get("/singles")
+async def get_singles_catalog(
+    current_user: OptionalUser,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """
+    Get all catalog items in the Singles category with their matched transactions.
+    Uses keyword matching like Master Catalog does.
+    """
+    from app.models.whatnot import CatalogRuleType
+
+    # Get all singles catalog items (ordered by priority DESC)
+    singles = db.exec(
+        select(ProductCatalog)
+        .where(ProductCatalog.category == "Singles")
+        .order_by(ProductCatalog.priority.desc(), ProductCatalog.name)
+    ).all()
+
+    # Get all transactions for matching
+    all_transactions = db.exec(
+        select(SalesTransaction).where(
+            or_(
+                SalesTransaction.show_id != None,
+                SalesTransaction.sale_type == 'marketplace'
+            )
+        )
+    ).all()
+
+    # Match transactions using keywords (same logic as Master Catalog)
+    # Track which transactions have been matched to prevent double-counting
+    transaction_matches = {}  # transaction_id -> catalog_item_id
+
+    # First, find the catch-all "Single Cards" item (lowest priority, matches generically)
+    catch_all_single = None
+    specific_singles = []
+    for item in singles:
+        if item.name == "Single Cards":
+            catch_all_single = item
+        else:
+            specific_singles.append(item)
+
+    # Match specific singles first (by priority)
+    for catalog_item in specific_singles:
+        keywords = catalog_item.include_keywords or catalog_item.keywords or []
+        exclude_keywords = catalog_item.exclude_keywords or []
+
+        for t in all_transactions:
+            if t.id in transaction_matches:
+                continue  # Already matched
+
+            item_name_lower = t.item_name.lower()
+            match = False
+
+            if catalog_item.rule_type == CatalogRuleType.INCLUDE_ALL:
+                match = all(kw.lower() in item_name_lower for kw in keywords)
+            elif catalog_item.rule_type == CatalogRuleType.INCLUDE_ANY:
+                match = any(kw.lower() in item_name_lower for kw in keywords)
+            elif catalog_item.rule_type == CatalogRuleType.INCLUDE_AND_EXCLUDE:
+                has_include = any(kw.lower() in item_name_lower for kw in keywords)
+                has_exclude = any(kw.lower() in item_name_lower for kw in exclude_keywords)
+                match = has_include and not has_exclude
+            else:
+                # Default: check if any keyword matches
+                match = any(kw.lower() in item_name_lower for kw in keywords)
+
+            if match:
+                transaction_matches[t.id] = catalog_item.id
+
+    # Then match remaining transactions to "Single Cards" catch-all
+    if catch_all_single:
+        keywords = catch_all_single.include_keywords or catch_all_single.keywords or []
+        for t in all_transactions:
+            if t.id in transaction_matches:
+                continue
+            item_name_lower = t.item_name.lower()
+            if any(kw.lower() in item_name_lower for kw in keywords):
+                transaction_matches[t.id] = catch_all_single.id
+
+    # Build results
+    result = []
+    for item in singles:
+        # Count matched transactions
+        matched_transactions = [
+            t for t in all_transactions
+            if transaction_matches.get(t.id) == item.id
+        ]
+
+        total_revenue = sum(t.gross_sale_price or Decimal("0") for t in matched_transactions)
+        total_earnings = sum(t.net_earnings or Decimal("0") for t in matched_transactions)
+
+        result.append({
+            "id": item.id,
+            "name": item.name,
+            "category": item.category,
+            "imageUrl": item.image_url,
+            "ruleType": item.rule_type.value if item.rule_type else "include_any",
+            "includeKeywords": item.include_keywords or [],
+            "excludeKeywords": item.exclude_keywords or [],
+            "priority": item.priority,
+            "sales": len(matched_transactions),
+            "revenue": float(total_revenue),
+            "earnings": float(total_earnings),
+        })
+
+    # Sort by name for display (specific cards first, then Single Cards last)
+    result.sort(key=lambda x: (x["name"] == "Single Cards", x["name"]))
+
+    return {"singles": result, "total": len(result)}
+
+
+@router.get("/singles/unmapped")
+async def get_unmapped_singles(
+    current_user: OptionalUser,
+    db: Session = Depends(get_whatnot_db),
+) -> dict:
+    """
+    Get transactions that match the generic 'Single Cards' catalog item keywords
+    but haven't been matched to specific card entries.
+    Uses keyword matching like Master Catalog.
+    """
+    from app.models.whatnot import CatalogRuleType
+
+    # Find the generic "Single Cards" catalog item
+    generic_single = db.exec(
+        select(ProductCatalog)
+        .where(ProductCatalog.name == "Single Cards")
+    ).first()
+
+    if not generic_single:
+        return {"unmapped": [], "total": 0, "generic_catalog_id": None}
+
+    # Get all Singles category items (specific cards)
+    specific_singles = db.exec(
+        select(ProductCatalog)
+        .where(ProductCatalog.category == "Singles")
+        .where(ProductCatalog.name != "Single Cards")
+        .order_by(ProductCatalog.priority.desc())
+    ).all()
+
+    # Get all transactions
+    all_transactions = db.exec(
+        select(SalesTransaction).where(
+            or_(
+                SalesTransaction.show_id != None,
+                SalesTransaction.sale_type == 'marketplace'
+            )
+        )
+    ).all()
+
+    # Match transactions to specific singles first
+    matched_to_specific = set()
+    for catalog_item in specific_singles:
+        keywords = catalog_item.include_keywords or catalog_item.keywords or []
+        exclude_keywords = catalog_item.exclude_keywords or []
+
+        for t in all_transactions:
+            if t.id in matched_to_specific:
+                continue
+
+            item_name_lower = t.item_name.lower()
+            match = False
+
+            if catalog_item.rule_type == CatalogRuleType.INCLUDE_ALL:
+                match = all(kw.lower() in item_name_lower for kw in keywords)
+            elif catalog_item.rule_type == CatalogRuleType.INCLUDE_ANY:
+                match = any(kw.lower() in item_name_lower for kw in keywords)
+            elif catalog_item.rule_type == CatalogRuleType.INCLUDE_AND_EXCLUDE:
+                has_include = any(kw.lower() in item_name_lower for kw in keywords)
+                has_exclude = any(kw.lower() in item_name_lower for kw in exclude_keywords)
+                match = has_include and not has_exclude
+            else:
+                match = any(kw.lower() in item_name_lower for kw in keywords)
+
+            if match:
+                matched_to_specific.add(t.id)
+
+    # Find transactions that match generic "Single Cards" but not specific singles
+    generic_keywords = generic_single.include_keywords or generic_single.keywords or []
+    unmapped_transactions = []
+
+    for t in all_transactions:
+        if t.id in matched_to_specific:
+            continue
+
+        item_name_lower = t.item_name.lower()
+        if any(kw.lower() in item_name_lower for kw in generic_keywords):
+            unmapped_transactions.append(t)
+
+    # Sort by date descending
+    unmapped_transactions.sort(key=lambda x: x.transaction_date or "", reverse=True)
+
+    result = []
+    for t in unmapped_transactions:
+        show_name = None
+        if t.show_id:
+            show = db.get(WhatnotShow, t.show_id)
+            show_name = show.show_name if show else None
+
+        result.append({
+            "id": t.id,
+            "date": t.transaction_date.isoformat() if t.transaction_date else None,
+            "itemName": t.item_name,
+            "buyer": t.buyer_username,
+            "price": float(t.gross_sale_price or 0),
+            "earnings": float(t.net_earnings or 0),
+            "showName": show_name,
+            "saleType": t.sale_type,
+            "owner": t.owner,
+        })
+
+    return {
+        "unmapped": result,
+        "total": len(result),
+        "generic_catalog_id": generic_single.id
+    }
+
+
+@router.get("/product-catalog/{catalog_id}/transactions")
+async def get_catalog_item_transactions(
+    catalog_id: int,
+    current_user: OptionalUser,
+    db: Session = Depends(get_whatnot_db),
+) -> List[dict]:
+    """
+    Get all transactions for a specific catalog item.
+    Uses keyword matching for Singles category items.
+    """
+    from app.models.whatnot import CatalogRuleType
+
+    catalog_item = db.get(ProductCatalog, catalog_id)
+    if not catalog_item:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+
+    # For Singles category, use keyword matching
+    if catalog_item.category == "Singles":
+        # Get all transactions
+        all_transactions = db.exec(
+            select(SalesTransaction).where(
+                or_(
+                    SalesTransaction.show_id != None,
+                    SalesTransaction.sale_type == 'marketplace'
+                )
+            )
+        ).all()
+
+        # If this is the generic "Single Cards" item, we need to exclude transactions
+        # that match more specific singles
+        if catalog_item.name == "Single Cards":
+            # Get all specific singles (not "Single Cards")
+            specific_singles = db.exec(
+                select(ProductCatalog)
+                .where(ProductCatalog.category == "Singles")
+                .where(ProductCatalog.name != "Single Cards")
+                .order_by(ProductCatalog.priority.desc())
+            ).all()
+
+            # Find transactions matched to specific singles
+            matched_to_specific = set()
+            for specific_item in specific_singles:
+                keywords = specific_item.include_keywords or specific_item.keywords or []
+                exclude_keywords = specific_item.exclude_keywords or []
+
+                for t in all_transactions:
+                    if t.id in matched_to_specific:
+                        continue
+
+                    item_name_lower = t.item_name.lower()
+                    match = False
+
+                    if specific_item.rule_type == CatalogRuleType.INCLUDE_ALL:
+                        match = all(kw.lower() in item_name_lower for kw in keywords)
+                    elif specific_item.rule_type == CatalogRuleType.INCLUDE_ANY:
+                        match = any(kw.lower() in item_name_lower for kw in keywords)
+                    elif specific_item.rule_type == CatalogRuleType.INCLUDE_AND_EXCLUDE:
+                        has_include = any(kw.lower() in item_name_lower for kw in keywords)
+                        has_exclude = any(kw.lower() in item_name_lower for kw in exclude_keywords)
+                        match = has_include and not has_exclude
+                    else:
+                        match = any(kw.lower() in item_name_lower for kw in keywords)
+
+                    if match:
+                        matched_to_specific.add(t.id)
+
+            # Get transactions that match generic Single Cards but not specific
+            generic_keywords = catalog_item.include_keywords or catalog_item.keywords or []
+            matched_transactions = []
+            for t in all_transactions:
+                if t.id in matched_to_specific:
+                    continue
+                item_name_lower = t.item_name.lower()
+                if any(kw.lower() in item_name_lower for kw in generic_keywords):
+                    matched_transactions.append(t)
+        else:
+            # Specific single card - match by keywords
+            keywords = catalog_item.include_keywords or catalog_item.keywords or []
+            exclude_keywords = catalog_item.exclude_keywords or []
+
+            matched_transactions = []
+            for t in all_transactions:
+                item_name_lower = t.item_name.lower()
+                match = False
+
+                if catalog_item.rule_type == CatalogRuleType.INCLUDE_ALL:
+                    match = all(kw.lower() in item_name_lower for kw in keywords)
+                elif catalog_item.rule_type == CatalogRuleType.INCLUDE_ANY:
+                    match = any(kw.lower() in item_name_lower for kw in keywords)
+                elif catalog_item.rule_type == CatalogRuleType.INCLUDE_AND_EXCLUDE:
+                    has_include = any(kw.lower() in item_name_lower for kw in keywords)
+                    has_exclude = any(kw.lower() in item_name_lower for kw in exclude_keywords)
+                    match = has_include and not has_exclude
+                else:
+                    match = any(kw.lower() in item_name_lower for kw in keywords)
+
+                if match:
+                    matched_transactions.append(t)
+
+        # Sort by date descending
+        matched_transactions.sort(key=lambda x: x.transaction_date or "", reverse=True)
+        transactions = matched_transactions
+    else:
+        # Non-Singles: use catalog_item_id mapping
+        transactions = db.exec(
+            select(SalesTransaction)
+            .where(SalesTransaction.catalog_item_id == catalog_id)
+            .order_by(SalesTransaction.transaction_date.desc())
+        ).all()
+
+    result = []
+    for t in transactions:
+        show_name = None
+        if t.show_id:
+            show = db.get(WhatnotShow, t.show_id)
+            show_name = show.show_name if show else None
+
+        result.append({
+            "id": t.id,
+            "date": t.transaction_date.isoformat() if t.transaction_date else None,
+            "itemName": t.item_name,
+            "buyer": t.buyer_username,
+            "price": float(t.gross_sale_price or 0),
+            "earnings": float(t.net_earnings or 0),
+            "showName": show_name,
+            "saleType": t.sale_type,
+            "owner": t.owner,
+        })
+
+    return result
+
+
 @router.get("/analytics/mapping-status")
 async def get_mapping_status(
     current_user: OptionalUser,
