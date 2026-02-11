@@ -10,6 +10,7 @@ from .deal_analyzer import router as deal_analyzer_router
 from .inventory import router as inventory_router
 from .cards import router as cards_router
 from .whatnot import router as whatnot_router
+from .whatnot_test import router as whatnot_test_router
 
 router = APIRouter()
 
@@ -39,4 +40,11 @@ router.include_router(
     whatnot_router,
     prefix="/whatnot",
     tags=["WhatNot Sales"],
+)
+
+# WhatNot Sales TEST endpoints (for regression testing)
+router.include_router(
+    whatnot_test_router,
+    prefix="/whatnot-test",
+    tags=["WhatNot Sales TEST"],
 )

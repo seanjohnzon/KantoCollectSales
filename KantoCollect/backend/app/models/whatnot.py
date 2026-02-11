@@ -415,6 +415,9 @@ class TransactionRead(SQLModel):
     roi_percent: Optional[Decimal]
     matched_cogs_rule_id: Optional[int]
     owner: Optional[str]  # Owner assignment (Cihan, Nima, Askar, Kanto)
+    catalog_item_id: Optional[int] = None  # Mapped catalog item ID
+    is_mapped: bool = False  # Whether this transaction is mapped to a catalog item
+    matched_keyword: Optional[str] = None  # The keyword that matched this transaction
 
 
 class TransactionUpdate(SQLModel):

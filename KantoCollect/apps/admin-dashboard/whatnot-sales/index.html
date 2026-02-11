@@ -2949,6 +2949,9 @@
 
     // Toggle expanded view of matched transactions
     async function toggleCatalogMatches(productId) {
+      // ENSURE productId is a number for consistent Set and cache key usage
+      productId = Number(productId);
+
       if (expandedCatalogItems.has(productId)) {
         expandedCatalogItems.delete(productId);
       } else {
@@ -2966,9 +2969,11 @@
 
     // Fetch transactions that match this catalog item
     async function fetchCatalogMatches(productId) {
+      // ENSURE productId is a number for consistent comparisons
+      productId = Number(productId);
       try {
-        // Find the product
-        const product = catalogProducts.find(p => p.id === productId);
+        // Find the product - use Number() for consistent comparison
+        const product = catalogProducts.find(p => Number(p.id) === productId);
         if (!product) return;
 
         // Fetch all transactions
@@ -2986,12 +2991,40 @@
         // Find CATCH_ALL item
         const catchAllItem = sortedCatalog.find(item => item.ruleType === 'catch_all');
 
+        // Find "Single Cards" item (for redirecting specific Singles)
+        const singleCardsItem = sortedCatalog.find(item => item.name === 'Single Cards');
+
         for (const t of transactions) {
           const itemNameLower = t.item_name.toLowerCase();
           let matchedItem = null;
           let matchedKeyword = null;
 
-          // Try to match against catalog items (ordered by priority)
+          // PRIORITY 1: Check for direct catalog_item_id mapping (from dropdown remapping)
+          if (t.catalog_item_id && t.is_mapped) {
+            // Convert to number to handle any string/number type mismatch
+            const txCatalogId = Number(t.catalog_item_id);
+
+            // DIRECT MATCH: If this transaction is mapped to the product we're expanding, include it
+            if (txCatalogId === productId) {
+              matchedItem = productId;
+              matchedKeyword = t.matched_keyword || '(remapped)';
+            } else {
+              // Check if it's mapped to another catalog item in our list
+              const mappedCatalog = sortedCatalog.find(c => Number(c.id) === txCatalogId);
+              if (mappedCatalog) {
+                matchedItem = txCatalogId;
+                matchedKeyword = t.matched_keyword || '(remapped)';
+              } else if (singleCardsItem) {
+                // If catalog_item_id points to a Singles item not in our list,
+                // redirect to "Single Cards" (same as backend logic)
+                matchedItem = singleCardsItem.id;
+                matchedKeyword = t.matched_keyword || '(single card)';
+              }
+            }
+          }
+
+          // PRIORITY 2: Try to match against catalog items (ordered by priority)
+          if (!matchedItem) {
           for (const catalogItem of sortedCatalog) {
             // Skip CATCH_ALL items in this pass
             if (catalogItem.ruleType === 'catch_all') continue;
@@ -3037,19 +3070,35 @@
               break;
             }
           }
+          } // Close the if (!matchedItem) block
 
-          // If no match found and we have a CATCH_ALL item, assign to it
+          // PRIORITY 3: If no match found and we have a CATCH_ALL item, assign to it
           if (!matchedItem && catchAllItem) {
             matchedItem = catchAllItem.id;
             matchedKeyword = '(catch all)';
           }
 
           // Only include this transaction if it matched THIS product
-          if (matchedItem === productId) {
+          // Use Number() for consistent comparison to avoid string/number type issues
+          if (Number(matchedItem) === Number(productId)) {
             matches.push({
               ...t,
               matchedKeyword: matchedKeyword || '(unknown)'
             });
+          }
+        }
+
+        // SAFETY: Ensure transactions with direct catalog_item_id are included
+        // This catches any that might have been missed by the matching logic
+        for (const t of transactions) {
+          if (t.catalog_item_id && t.is_mapped && Number(t.catalog_item_id) === Number(productId)) {
+            const alreadyIncluded = matches.some(m => m.id === t.id);
+            if (!alreadyIncluded) {
+              matches.push({
+                ...t,
+                matchedKeyword: t.matched_keyword || '(direct mapping)'
+              });
+            }
           }
         }
 
@@ -3218,11 +3267,24 @@
           throw new Error(errorData.detail || 'Failed to remap transaction');
         }
 
-        // Clear the cache for both old and new catalog items
-        delete catalogTransactions[currentCatalogId];
-        delete catalogTransactions[newCatalogId];
+        // Clear ALL cached transaction data to force fresh fetch
+        for (const key of Object.keys(catalogTransactions)) {
+          delete catalogTransactions[key];
+        }
 
-        // Reload Master Catalog to reflect changes
+        // Auto-expand the target catalog item
+        const newId = parseInt(newCatalogId);
+        expandedCatalogItems.add(newId);
+
+        // Reload Master Catalog FIRST to update catalogProducts
+        await loadMasterCatalog();
+
+        // Now fetch data for ALL expanded items with fresh catalogProducts
+        for (const expandedId of expandedCatalogItems) {
+          await fetchCatalogMatches(expandedId);
+        }
+
+        // Reload again to render the expanded sections
         await loadMasterCatalog();
 
       } catch (error) {
@@ -4248,10 +4310,20 @@
         // Sort catalog by priority (same as Master Catalog)
         const sortedCatalog = [...catalogProducts].sort((a, b) => (b.priority || 0) - (a.priority || 0));
         const catchAllItem = sortedCatalog.find(item => item.ruleType === 'catch_all');
+        const singleCardsItem = sortedCatalog.find(item => item.name === 'Single Cards');
 
         // Function to match transaction to catalog item (same logic as Master Catalog)
-        function matchToCatalog(itemName) {
-          const itemNameLower = itemName.toLowerCase();
+        function matchToCatalog(transaction) {
+          // PRIORITY 1: Check for direct catalog_item_id mapping (from dropdown remapping)
+          if (transaction.catalog_item_id && transaction.is_mapped) {
+            const mappedCatalog = sortedCatalog.find(c => c.id === transaction.catalog_item_id);
+            if (mappedCatalog) return mappedCatalog;
+            // Redirect specific Singles to "Single Cards"
+            if (singleCardsItem) return singleCardsItem;
+          }
+
+          // PRIORITY 2: Keyword matching
+          const itemNameLower = transaction.item_name.toLowerCase();
           for (const catalogItem of sortedCatalog) {
             if (catalogItem.ruleType === 'catch_all') continue;
             let match = false;
@@ -4274,13 +4346,15 @@
             }
             if (match) return catalogItem;
           }
+
+          // PRIORITY 3: Fall back to CATCH_ALL
           return catchAllItem || null;
         }
 
         // Group transactions by catalog item (same as Master Catalog)
         const catalogGroups = {};
         for (const t of transactions) {
-          const matchedCatalog = matchToCatalog(t.item_name);
+          const matchedCatalog = matchToCatalog(t);
           const catalogId = matchedCatalog ? matchedCatalog.id : 'unmatched';
           const catalogName = matchedCatalog ? matchedCatalog.name : '(Unmatched)';
           const catalogImage = matchedCatalog ? matchedCatalog.imageUrl : '';
@@ -4426,9 +4500,19 @@
       const catalogProducts = window.ownerCatalogCache || [];
       const sortedCatalog = [...catalogProducts].sort((a, b) => (b.priority || 0) - (a.priority || 0));
       const catchAllItem = sortedCatalog.find(item => item.ruleType === 'catch_all');
+      const singleCardsItem = sortedCatalog.find(item => item.name === 'Single Cards');
 
-      function matchToCatalog(itemName) {
-        const itemNameLower = itemName.toLowerCase();
+      function matchToCatalog(transaction) {
+        // PRIORITY 1: Check for direct catalog_item_id mapping (from dropdown remapping)
+        if (transaction.catalog_item_id && transaction.is_mapped) {
+          const mappedCatalog = sortedCatalog.find(c => c.id === transaction.catalog_item_id);
+          if (mappedCatalog) return mappedCatalog;
+          // Redirect specific Singles to "Single Cards"
+          if (singleCardsItem) return singleCardsItem;
+        }
+
+        // PRIORITY 2: Keyword matching
+        const itemNameLower = transaction.item_name.toLowerCase();
         for (const catalogItem of sortedCatalog) {
           if (catalogItem.ruleType === 'catch_all') continue;
           let match = false;
@@ -4451,12 +4535,14 @@
           }
           if (match) return catalogItem;
         }
+
+        // PRIORITY 3: Fall back to CATCH_ALL
         return catchAllItem || null;
       }
 
       const catalogGroups = {};
       for (const t of ownerTransactionsData) {
-        const matchedCatalog = matchToCatalog(t.item_name);
+        const matchedCatalog = matchToCatalog(t);
         const catId = matchedCatalog ? matchedCatalog.id : 'unmatched';
         const catalogName = matchedCatalog ? matchedCatalog.name : '(Unmatched)';
         const catalogImage = matchedCatalog ? matchedCatalog.imageUrl : '';

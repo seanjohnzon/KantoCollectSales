@@ -274,6 +274,14 @@ def get_show_details(session: Session, show_id: int) -> dict:
             'has_cogs': t.cogs is not None
         })
 
+    # Calculate total_cogs from transactions (in case stored value is stale)
+    calculated_total_cogs = sum(
+        t.cogs for t in transactions if t.cogs is not None
+    )
+    calculated_total_profit = sum(
+        t.net_profit for t in transactions if t.net_profit is not None
+    )
+
     return {
         'show': {
             'id': show.id,
@@ -281,8 +289,8 @@ def get_show_details(session: Session, show_id: int) -> dict:
             'show_name': show.show_name,
             'total_gross_sales': show.total_gross_sales,
             'total_net_earnings': show.total_net_earnings,
-            'total_net_profit': show.total_net_profit,
-            'total_cogs': show.total_cogs,
+            'total_net_profit': calculated_total_profit or show.total_net_profit,
+            'total_cogs': calculated_total_cogs or show.total_cogs,
             'item_count': show.item_count,
             'unique_buyers': show.unique_buyers,
         },
