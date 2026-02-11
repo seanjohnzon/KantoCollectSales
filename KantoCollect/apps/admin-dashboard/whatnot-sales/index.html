@@ -306,7 +306,7 @@
         </div>
 
         <h2 id="showDetailTitle">Show Details</h2>
-        <div id="showDetailMeta" class="muted" style="margin-bottom:20px;"></div>
+        <div id="showDetailMeta" class="muted" style="margin-bottom:20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;"></div>
 
         <!-- Show Summary Stats -->
         <div class="stat-grid" style="margin-bottom:24px;">
@@ -752,6 +752,37 @@
     let editingRuleId = null;
     let adminEnabled = false;
     let adminKey = null;
+
+    // Helper function to parse date strings without timezone issues
+    // Input: "2025-12-02" -> Output: Date object for Dec 2, 2025 in local time
+    function parseLocalDate(dateStr) {
+      if (!dateStr) return null;
+      // Handle both "2025-12-02" and "2025-12-02T00:00:00" formats
+      const parts = dateStr.split('T')[0].split('-');
+      if (parts.length !== 3) return null;
+      // Month is 0-indexed in JavaScript
+      return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+
+    // Format date for display (e.g., "Dec 2, 2025")
+    function formatDateDisplay(dateStr, format = 'short') {
+      const date = parseLocalDate(dateStr);
+      if (!date || isNaN(date.getTime())) return 'Unknown Date';
+      if (format === 'long') {
+        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      }
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    // Format date for input field (YYYY-MM-DD)
+    function formatDateInput(dateStr) {
+      if (!dateStr) return '';
+      // If already in YYYY-MM-DD format, return as-is
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+      // Otherwise parse and format
+      const parts = dateStr.split('T')[0];
+      return parts;
+    }
 
     // Admin lock/unlock
     function enableAdmin() {
@@ -1348,9 +1379,8 @@
           totalBuyers += buyers;
           if (cogs > 0) showsWithCOGS++;
 
-          // Format date
-          const date = new Date(show.show_date);
-          const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          // Format date using helper to avoid timezone issues
+          const dateStr = formatDateDisplay(show.show_date, 'short');
 
           // Determine profit color
           const profitColor = profit > 0 ? '#22c55e' : profit < 0 ? '#ef4444' : '#94a3b8';
@@ -1426,11 +1456,12 @@
         currentShowId = showId;
         currentShowPage = page;
 
-        // Fetch show details
+        // Fetch show details - API returns { show: {...}, transactions: [...] }
         const showRes = await fetch(`${apiBase}/shows/${showId}`, { headers: authHeaders() });
-        let show = {};
+        let showData = {};
         if (showRes.ok) {
-          show = await showRes.json();
+          const response = await showRes.json();
+          showData = response.show || response; // Handle both nested and flat response
         }
 
         // Fetch ALL transactions for this show to get total count
@@ -1454,26 +1485,35 @@
         }
         const calcProfit = calcEarnings - calcCogs;
 
-        // Get show name - try from show object, or from first transaction, or use showId
-        const showName = show.show_name || (allTransactions[0]?.show_name) || `Show #${showId}`;
-        const showDate = show.show_date || (allTransactions[0]?.created_at);
+        // Get show name and date from the show object
+        const showName = showData.show_name || (allTransactions[0]?.show_name) || `Show #${showId}`;
+        const showDate = showData.show_date;
 
-        // Update header
-        let dateStr = 'Unknown Date';
-        if (showDate) {
-          const date = new Date(showDate);
-          if (!isNaN(date.getTime())) {
-            dateStr = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-          }
-        }
+        // Update header - use helper functions to avoid timezone issues
+        const dateStr = formatDateDisplay(showDate, 'long');
+        const rawDate = formatDateInput(showDate);
+
         document.getElementById('showDetailTitle').textContent = `🎬 ${showName}`;
-        document.getElementById('showDetailMeta').textContent = `${dateStr} • ${totalTransactions} transactions (Page ${page} of ${totalPages})`;
+
+        // Show edit button for admin
+        const metaEl = document.getElementById('showDetailMeta');
+        if (adminEnabled) {
+          metaEl.innerHTML = `
+            <span id="showDateDisplay">${dateStr}</span>
+            <button onclick="editShowDate(${showId}, '${rawDate}')" style="padding:4px 8px; background:#3b82f6; color:white; border:none; border-radius:4px; cursor:pointer; font-size:11px;">
+              Edit Date
+            </button>
+            <span>• ${totalTransactions} transactions (Page ${page} of ${totalPages})</span>
+          `;
+        } else {
+          metaEl.textContent = `${dateStr} • ${totalTransactions} transactions (Page ${page} of ${totalPages})`;
+        }
 
         // Update summary stats - use calculated values (fallback to show values if needed)
-        const revenue = calcRevenue > 0 ? calcRevenue : parseFloat(show.total_gross_sales || 0);
-        const cogs = calcCogs > 0 ? calcCogs : parseFloat(show.total_cogs || 0);
-        const profit = calcCogs > 0 ? calcProfit : parseFloat(show.total_net_profit || 0);
-        const itemCount = totalTransactions || show.item_count || 0;
+        const revenue = calcRevenue > 0 ? calcRevenue : parseFloat(showData.total_gross_sales || 0);
+        const cogs = calcCogs > 0 ? calcCogs : parseFloat(showData.total_cogs || 0);
+        const profit = calcCogs > 0 ? calcProfit : parseFloat(showData.total_net_profit || 0);
+        const itemCount = totalTransactions || showData.item_count || 0;
 
         document.getElementById('detailTotalItems').textContent = itemCount;
         document.getElementById('detailRevenue').textContent = `$${revenue.toFixed(2)}`;
@@ -1617,6 +1657,43 @@
       document.getElementById('shows-list-view').style.display = 'block';
       currentShowPage = 1; // Reset pagination
       loadShows(); // Refresh the shows list
+    }
+
+    function editShowDate(showId, currentDate) {
+      const newDate = prompt('Enter new date (YYYY-MM-DD format):', currentDate);
+      if (!newDate) return;
+
+      // Validate date format
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+        alert('Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15)');
+        return;
+      }
+
+      // Call API to update
+      updateShowDate(showId, newDate);
+    }
+
+    async function updateShowDate(showId, newDate) {
+      try {
+        const res = await fetch(`${apiBase}/shows/${showId}`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ show_date: newDate })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Failed to update show date');
+        }
+
+        alert('Show date updated successfully!');
+        viewShowDetail(showId, currentShowPage); // Refresh the view
+      } catch (error) {
+        alert(`Error updating date: ${error.message}`);
+      }
     }
 
     function updateTransactionCalc(index) {

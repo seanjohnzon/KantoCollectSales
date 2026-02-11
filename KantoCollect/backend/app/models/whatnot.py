@@ -391,6 +391,7 @@ class ShowCreate(SQLModel):
 class ShowUpdate(SQLModel):
     """Update schema for show metadata."""
     show_name: Optional[str] = None
+    show_date: Optional[date] = None
     notes: Optional[str] = None
 
 
